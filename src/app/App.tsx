@@ -43,10 +43,22 @@ function ChatInterface() {
         setIsLoadingConfig(true);
         setConfigError(null);
         const cfg = await fetchConfig();
-        setConfig(cfg);
-        if (cfg.providers.length > 0) {
-          const provider = cfg.providers[0].id;
-          const model = cfg.models.find(m => m.provider === provider)?.id || cfg.models[0]?.id || '';
+        // Normalize in case backend shape differs
+        const normalizedProviders = Array.isArray(cfg.providers)
+          ? cfg.providers.map((p: any) => ({ id: p.id ?? p.key ?? String(p), name: p.name ?? p.label ?? String(p) }))
+          : [];
+        const normalizedModels = Array.isArray(cfg.models)
+          ? cfg.models
+          : (cfg as any).models && typeof (cfg as any).models === 'object'
+            ? Object.entries((cfg as any).models).flatMap(([providerKey, arr]: [string, any]) =>
+                (Array.isArray(arr) ? arr : []).map((modelId: any) => ({ id: String(modelId), provider: providerKey, name: String(modelId) }))
+              )
+            : [];
+        const normCfg: ConfigResponse = { providers: normalizedProviders, models: normalizedModels };
+        setConfig(normCfg);
+        if (normCfg.providers.length > 0) {
+          const provider = normCfg.providers[0].id;
+          const model = normCfg.models.find(m => m.provider === provider)?.id || normCfg.models[0]?.id || '';
           setSelectedProvider(provider);
           setSelectedModel(model);
         }
