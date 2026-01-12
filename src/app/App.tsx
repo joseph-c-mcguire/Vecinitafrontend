@@ -7,6 +7,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
 import { Source } from './components/SourceCard';
+import { fetchConfig, streamQuestion, getOrCreateThreadId, ConfigResponse, StreamEvent } from '../api/client';
 
 function ChatInterface() {
   const { t, language } = useLanguage();
@@ -16,6 +17,12 @@ function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAccessibilityOpen, setIsAccessibilityOpen] = useState(false);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
+  const [config, setConfig] = useState<ConfigResponse | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -26,6 +33,36 @@ function ChatInterface() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+
+  // Load thread ID and provider/model config
+  useEffect(() => {
+    setThreadId(getOrCreateThreadId());
+
+    const loadConfig = async () => {
+      try {
+        setIsLoadingConfig(true);
+        setConfigError(null);
+        const cfg = await fetchConfig();
+        setConfig(cfg);
+        if (cfg.providers.length > 0) {
+          const provider = cfg.providers[0].id;
+          const model = cfg.models.find(m => m.provider === provider)?.id || cfg.models[0]?.id || '';
+          setSelectedProvider(provider);
+          setSelectedModel(model);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Failed to load configuration';
+        setConfigError(msg);
+        // Initialize defaults even if config fails, to avoid blocking UI
+        setSelectedProvider(prev => prev || 'default');
+        setSelectedModel(prev => prev || 'default');
+      } finally {
+        setIsLoadingConfig(false);
+      }
+    };
+
+    loadConfig();
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
@@ -63,112 +100,9 @@ function ChatInterface() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  // Mock RAG responses with sources
-  const getMockResponse = (userMessage: string): { content: string; sources: Source[] } => {
-    const isSpanish = language === 'es';
-    
-    // Simple keyword detection for relevant responses
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('water') || lowerMessage.includes('agua') || lowerMessage.includes('contamin')) {
-      return {
-        content: isSpanish
-          ? 'La calidad del agua es un tema importante para la salud comunitaria. Según estudios recientes, la contaminación del agua puede provenir de varias fuentes, incluyendo descargas industriales, escorrentía agrícola y sistemas de alcantarillado obsoletos. Es importante monitorear regularmente la calidad del agua en tu vecindario y reportar cualquier preocupación a las autoridades locales.'
-          : 'Water quality is an important topic for community health. According to recent studies, water contamination can come from various sources including industrial discharge, agricultural runoff, and outdated sewage systems. It\'s important to regularly monitor water quality in your neighborhood and report any concerns to local authorities.',
-        sources: [
-          {
-            title: isSpanish ? 'Estándares de Calidad del Agua - EPA' : 'Water Quality Standards - EPA',
-            url: 'https://www.epa.gov/wqs-tech',
-            snippet: isSpanish
-              ? 'Información sobre los estándares de calidad del agua y regulaciones.'
-              : 'Information about water quality standards and regulations.',
-          },
-          {
-            title: isSpanish ? 'Monitoreo de Calidad del Agua Comunitaria' : 'Community Water Quality Monitoring',
-            url: 'https://www.waterqualitydata.us/',
-            snippet: isSpanish
-              ? 'Datos de monitoreo de calidad del agua de todo el país.'
-              : 'Water quality monitoring data from across the country.',
-          },
-          {
-            title: isSpanish ? 'Guía de Agua Potable Segura' : 'Safe Drinking Water Guide',
-            url: 'https://www.cdc.gov/healthywater/',
-            snippet: isSpanish
-              ? 'Recursos para garantizar agua potable segura en comunidades.'
-              : 'Resources for ensuring safe drinking water in communities.',
-          },
-        ],
-      };
-    }
-    
-    if (lowerMessage.includes('air') || lowerMessage.includes('aire') || lowerMessage.includes('pollution') || lowerMessage.includes('contaminación')) {
-      return {
-        content: isSpanish
-          ? 'La calidad del aire afecta directamente nuestra salud respiratoria y bienestar general. Los principales contaminantes incluyen partículas finas (PM2.5), ozono, dióxido de nitrógeno y dióxido de azufre. Puedes verificar la calidad del aire local usando el Índice de Calidad del Aire (AQI) y tomar precauciones durante días de alta contaminación.'
-          : 'Air quality directly affects our respiratory health and overall wellbeing. Major pollutants include fine particulate matter (PM2.5), ozone, nitrogen dioxide, and sulfur dioxide. You can check local air quality using the Air Quality Index (AQI) and take precautions during high pollution days.',
-        sources: [
-          {
-            title: isSpanish ? 'Índice de Calidad del Aire - AirNow' : 'Air Quality Index - AirNow',
-            url: 'https://www.airnow.gov/',
-            snippet: isSpanish
-              ? 'Información en tiempo real sobre la calidad del aire en tu área.'
-              : 'Real-time air quality information for your area.',
-          },
-          {
-            title: isSpanish ? 'Efectos de la Contaminación del Aire en la Salud' : 'Health Effects of Air Pollution',
-            url: 'https://www.who.int/health-topics/air-pollution',
-            snippet: isSpanish
-              ? 'Información de la OMS sobre impactos en la salud.'
-              : 'WHO information on health impacts.',
-          },
-        ],
-      };
-    }
-    
-    if (lowerMessage.includes('climate') || lowerMessage.includes('clima') || lowerMessage.includes('change') || lowerMessage.includes('cambio')) {
-      return {
-        content: isSpanish
-          ? 'El cambio climático está afectando a las comunidades de varias maneras, incluyendo eventos climáticos extremos más frecuentes, cambios en los patrones de temperatura y precipitación, y amenazas a la infraestructura local. Las comunidades pueden tomar medidas para la adaptación climática y la resiliencia mediante planificación urbana sostenible, infraestructura verde y preparación para emergencias.'
-          : 'Climate change is affecting communities in various ways, including more frequent extreme weather events, shifts in temperature and precipitation patterns, and threats to local infrastructure. Communities can take steps toward climate adaptation and resilience through sustainable urban planning, green infrastructure, and emergency preparedness.',
-        sources: [
-          {
-            title: isSpanish ? 'Adaptación Climática - NOAA' : 'Climate Adaptation - NOAA',
-            url: 'https://www.noaa.gov/education/resource-collections/climate',
-            snippet: isSpanish
-              ? 'Recursos sobre adaptación y resiliencia climática.'
-              : 'Resources on climate adaptation and resilience.',
-          },
-          {
-            title: isSpanish ? 'Guía de Acción Climática Comunitaria' : 'Community Climate Action Guide',
-            url: 'https://www.c2es.org/',
-            snippet: isSpanish
-              ? 'Estrategias prácticas para la acción climática local.'
-              : 'Practical strategies for local climate action.',
-          },
-        ],
-      };
-    }
-    
-    // Default response
-    return {
-      content: isSpanish
-        ? 'Gracias por tu pregunta. Como asistente de información ambiental y comunitaria, puedo ayudarte con temas relacionados con calidad del agua, calidad del aire, cambio climático, justicia ambiental y recursos comunitarios. ¿Podrías darme más detalles sobre lo que te gustaría saber?'
-        : 'Thank you for your question. As an environmental and community information assistant, I can help you with topics related to water quality, air quality, climate change, environmental justice, and community resources. Could you provide more details about what you\'d like to know?',
-      sources: [
-        {
-          title: isSpanish ? 'Centro de Recursos Ambientales' : 'Environmental Resources Center',
-          url: 'https://www.epa.gov/',
-          snippet: isSpanish
-            ? 'Recursos generales sobre temas ambientales y comunitarios.'
-            : 'General resources on environmental and community topics.',
-        },
-      ],
-    };
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !threadId || !selectedProvider || !selectedModel) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -181,20 +115,76 @@ function ChatInterface() {
     setInput('');
     setIsLoading(true);
 
-    // Simulate API delay
-    setTimeout(() => {
-      const response = getMockResponse(input);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.content,
-        sources: response.sources,
-        timestamp: new Date(),
-      };
+    const assistantId = (Date.now() + 1).toString();
+    const placeholder: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '',
+      sources: [],
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, placeholder]);
 
-      setMessages((prev) => [...prev, assistantMessage]);
+    try {
+      let responseContent = '';
+      let responseSources: Source[] = [];
+
+      await streamQuestion(
+        userMessage.content,
+        language,
+        selectedProvider,
+        selectedModel,
+        threadId,
+        (event: StreamEvent) => {
+          if (event.type === 'thinking') {
+            // Optionally surface thinking messages in UI if desired
+            return;
+          }
+          if (event.type === 'complete') {
+            try {
+              const data = JSON.parse(event.data);
+              responseContent = data.answer || data.content || '';
+              responseSources = data.sources || [];
+            } catch {
+              responseContent = event.data;
+            }
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated.length - 1;
+              if (last >= 0 && updated[last].id === assistantId) {
+                updated[last] = { ...updated[last], content: responseContent, sources: responseSources };
+              }
+              return updated;
+            });
+          }
+          if (event.type === 'clarification') {
+            setMessages((prev) => {
+              const updated = [...prev];
+              const last = updated.length - 1;
+              if (last >= 0 && updated[last].id === assistantId) {
+                updated[last] = { ...updated[last], content: event.data };
+              }
+              return updated;
+            });
+          }
+          if (event.type === 'error') {
+            throw new Error(event.data);
+          }
+        }
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to get response';
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated.length - 1;
+        if (last >= 0 && updated[last].role === 'assistant') {
+          updated[last] = { ...updated[last], content: `Error: ${msg}` };
+        }
+        return updated;
+      });
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   const handleNewChat = () => {
@@ -286,6 +276,48 @@ function ChatInterface() {
             <ThemeToggle theme={theme} setTheme={setTheme} />
           </div>
         </div>
+        {/* Provider/Model selectors row */}
+        <div className="container mx-auto px-2 sm:px-4 pb-2">
+          {isLoadingConfig ? (
+            <p className="text-xs text-muted-foreground">Loading configuration…</p>
+          ) : configError ? (
+            <p className="text-xs text-red-500">{configError}</p>
+          ) : config ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">{t('provider') || 'Provider'}</label>
+                <select
+                  className="text-sm bg-background border border-border rounded px-2 py-1"
+                  value={selectedProvider}
+                  onChange={(e) => {
+                    const provider = e.target.value;
+                    setSelectedProvider(provider);
+                    const nextModel = config.models.find(m => m.provider === provider)?.id || '';
+                    setSelectedModel(nextModel);
+                  }}
+                >
+                  {config.providers.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name || p.id}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-muted-foreground">{t('model') || 'Model'}</label>
+                <select
+                  className="text-sm bg-background border border-border rounded px-2 py-1"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                >
+                  {config.models
+                    .filter((m) => m.provider === selectedProvider)
+                    .map((m) => (
+                      <option key={m.id} value={m.id}>{m.name || m.id}</option>
+                    ))}
+                </select>
+              </div>
+            </div>
+          ) : null}
+        </div>
       </header>
 
       {/* Messages */}
@@ -337,9 +369,15 @@ function ChatInterface() {
             </button>
           </form>
           <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-1.5 sm:mt-2 px-2">
-            {language === 'es'
-              ? 'Este chatbot proporcionará información basada en una base de datos vectorial de Supabase cuando esté conectado.'
-              : 'This chatbot will provide information based on a Supabase vector database when connected.'}
+            {(() => {
+              if (isLoading) return language === 'es' ? 'Pensando… transmitiendo respuesta…' : 'Thinking… streaming response…';
+              if (configError) return language === 'es' ? 'No se pudo cargar la configuración; usando valores por defecto.' : 'Could not load config; using defaults.';
+              if (selectedProvider && selectedModel)
+                return language === 'es'
+                  ? `Conectado a ${selectedProvider} · Modelo ${selectedModel} · Hilo ${threadId?.slice(0, 8)}`
+                  : `Connected to ${selectedProvider} · Model ${selectedModel} · Thread ${threadId?.slice(0, 8)}`;
+              return language === 'es' ? 'Listo.' : 'Ready.';
+            })()}
           </p>
         </div>
       </footer>
