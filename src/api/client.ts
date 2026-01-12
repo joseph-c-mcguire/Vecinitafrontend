@@ -50,16 +50,44 @@ const getBackendUrl = (): string => {
  */
 export const fetchConfig = async (): Promise<ConfigResponse> => {
   const url = `${getBackendUrl()}/config`;
-  
+
   try {
     const response = await fetch(url);
-    
+
     if (!response.ok) {
       throw new Error(`Failed to fetch config: ${response.status} ${response.statusText}`);
     }
-    
+
     const data = await response.json();
-    return data as ConfigResponse;
+
+    // Normalize backend shape to ConfigResponse
+    // Backend returns: { providers: [{ key, label }], models: { [providerKey]: string[] } }
+    const providers: Provider[] = Array.isArray(data.providers)
+      ? data.providers.map((p: any) => ({
+          id: p.key ?? p.id ?? String(p),
+          name: p.label ?? p.name ?? String(p),
+        }))
+      : [];
+
+    let models: Model[] = [];
+    if (Array.isArray(data.models)) {
+      // Already in desired shape
+      models = data.models.map((m: any) => ({
+        id: m.id ?? m.name ?? String(m),
+        provider: m.provider ?? '',
+        name: m.name ?? m.id ?? String(m),
+      }));
+    } else if (data.models && typeof data.models === 'object') {
+      // Flatten object map of provider -> [modelIds]
+      for (const [providerKey, arr] of Object.entries<any>(data.models)) {
+        const modelIds: any[] = Array.isArray(arr) ? arr : [];
+        for (const modelId of modelIds) {
+          models.push({ id: String(modelId), provider: providerKey, name: String(modelId) });
+        }
+      }
+    }
+
+    return { providers, models } as ConfigResponse;
   } catch (error) {
     console.error('Error fetching config:', error);
     throw error;
