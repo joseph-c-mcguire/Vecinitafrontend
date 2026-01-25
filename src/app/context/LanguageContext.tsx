@@ -134,6 +134,62 @@ const translations: Translations = {
     en: 'Searching knowledge base...|Analyzing your question...|Finding relevant sources...|Preparing response...',
     es: 'Buscando en la base de conocimientos...|Analizando tu pregunta...|Encontrando fuentes relevantes...|Preparando respuesta...',
   },
+  llmModel: {
+    en: 'LLM Model',
+    es: 'Modelo LLM',
+  },
+  llmModelDescription: {
+    en: 'Select the language model for generating responses.',
+    es: 'Selecciona el modelo de lenguaje para generar respuestas.',
+  },
+  embeddingService: {
+    en: 'Embedding Service',
+    es: 'Servicio de Embeddings',
+  },
+  embeddingServiceDescription: {
+    en: 'Select the embedding service for vector search.',
+    es: 'Selecciona el servicio de embeddings para búsqueda vectorial.',
+  },
+  llmProvider: {
+    en: 'LLM Provider',
+    es: 'Proveedor LLM',
+  },
+  llmProviderDescription: {
+    en: 'Select the provider for language models.',
+    es: 'Selecciona el proveedor de modelos de lenguaje.',
+  },
+  embeddingProvider: {
+    en: 'Embedding Provider',
+    es: 'Proveedor de Embeddings',
+  },
+  embeddingProviderDescription: {
+    en: 'Select the provider for embedding models.',
+    es: 'Selecciona el proveedor de modelos de embeddings.',
+  },
+  backendSettings: {
+    en: 'Backend Settings',
+    es: 'Configuración del Backend',
+  },
+  documentDetails: {
+    en: 'Document Details',
+    es: 'Detalles del Documento',
+  },
+  metadata: {
+    en: 'Metadata',
+    es: 'Metadatos',
+  },
+  createdAt: {
+    en: 'Created At',
+    es: 'Fecha de Creación',
+  },
+  documentId: {
+    en: 'Document ID',
+    es: 'ID del Documento',
+  },
+  openSource: {
+    en: 'Open Source',
+    es: 'Abrir Fuente',
+  },
 };
 
 interface LanguageContextType {
@@ -145,7 +201,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>('es');
 
   const t = (key: string): string => {
     return translations[key]?.[language] || key;
