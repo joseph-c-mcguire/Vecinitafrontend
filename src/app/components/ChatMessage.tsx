@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bot, User } from 'lucide-react';
 import { SourceCard, Source } from './SourceCard';
+import { MessageFeedback, Feedback } from './MessageFeedback';
 import { useLanguage } from '../context/LanguageContext';
 
 export interface Message {
@@ -9,13 +10,15 @@ export interface Message {
   content: string;
   sources?: Source[];
   timestamp: Date;
+  feedback?: Feedback;
 }
 
 interface ChatMessageProps {
   message: Message;
+  onFeedbackSubmit?: (feedback: Feedback) => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
   const { t } = useLanguage();
   const isUser = message.role === 'user';
 
@@ -49,6 +52,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
               ))}
             </div>
           </div>
+        )}
+        {!isUser && onFeedbackSubmit && (
+          <MessageFeedback
+            messageId={message.id}
+            initialFeedback={message.feedback}
+            onFeedbackSubmit={onFeedbackSubmit}
+          />
         )}
       </div>
     </div>
