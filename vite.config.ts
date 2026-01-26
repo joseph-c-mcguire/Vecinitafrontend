@@ -16,4 +16,21 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+    server: {
+      // Dev server proxy configuration for local development
+      proxy: {
+        // Proxy all /config requests to backend
+        '/config': {
+          target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
+          changeOrigin: true,
+          rewrite: (path) => path,
+        },
+        // Proxy all /ask-stream requests to backend
+        '/ask-stream': {
+          target: process.env.VITE_BACKEND_URL || 'http://localhost:8000',
+          changeOrigin: true,
+          rewrite: (path) => path,
+        },
+      },
+    },
 })
