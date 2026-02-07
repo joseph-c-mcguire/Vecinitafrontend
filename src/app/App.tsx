@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Home, MessageSquare, Settings, Sliders, HelpCircle } from 'lucide-react';
+import { Send, Home, MessageSquare, Settings, HelpCircle } from 'lucide-react';
 import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
 import { BackendSettingsProvider } from './context/BackendSettingsContext';
@@ -8,7 +8,6 @@ import { Feedback } from './components/MessageFeedback';
 import { ThemeToggle } from './components/ThemeToggle';
 import { LanguageSelector } from './components/LanguageSelector';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
-import { BackendSettingsPanel } from './components/BackendSettingsPanel';
 import { Source } from './components/SourceCard';
 import { SkipToContent } from './components/SkipToContent';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
@@ -25,7 +24,6 @@ function ChatInterface() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isAccessibilityOpen, setIsAccessibilityOpen] = useState(false);
-  const [isBackendSettingsOpen, setIsBackendSettingsOpen] = useState(false);
   const [isKeyboardShortcutsOpen, setIsKeyboardShortcutsOpen] = useState(false);
   const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -51,8 +49,6 @@ function ChatInterface() {
       if (e.key === 'Escape') {
         if (isAccessibilityOpen) {
           setIsAccessibilityOpen(false);
-        } else if (isBackendSettingsOpen) {
-          setIsBackendSettingsOpen(false);
         } else if (isKeyboardShortcutsOpen) {
           setIsKeyboardShortcutsOpen(false);
         }
@@ -61,7 +57,7 @@ function ChatInterface() {
 
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [isAccessibilityOpen, isBackendSettingsOpen, isKeyboardShortcutsOpen]);
+  }, [isAccessibilityOpen, isKeyboardShortcutsOpen]);
 
   useEffect(() => {
     if (theme === 'dark') {
@@ -298,13 +294,6 @@ function ChatInterface() {
         return;
       }
 
-      // Alt + S: Open settings
-      if (e.altKey && e.key === 's' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-        e.preventDefault();
-        setIsBackendSettingsOpen(true);
-        return;
-      }
-
       // Alt + A: Open accessibility
       if (e.altKey && e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
         e.preventDefault();
@@ -389,14 +378,6 @@ function ChatInterface() {
               <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" aria-hidden="true" />
             </button>
             <button
-              onClick={() => setIsBackendSettingsOpen(true)}
-              className="p-2 rounded-lg hover:bg-accent transition-colors hidden sm:flex"
-              aria-label={t('backendSettings')}
-              title={t('backendSettings')}
-            >
-              <Sliders className="w-4 h-4 sm:w-5 sm:h-5 text-foreground" aria-hidden="true" />
-            </button>
-            <button
               onClick={() => setIsAccessibilityOpen(true)}
               className="p-2 rounded-lg hover:bg-accent transition-colors hidden sm:flex"
               aria-label={t('accessibility')}
@@ -473,11 +454,6 @@ function ChatInterface() {
       {/* Accessibility Panel */}
       {isAccessibilityOpen && (
         <AccessibilityPanel isOpen={isAccessibilityOpen} onClose={() => setIsAccessibilityOpen(false)} />
-      )}
-
-      {/* Backend Settings Panel */}
-      {isBackendSettingsOpen && (
-        <BackendSettingsPanel isOpen={isBackendSettingsOpen} onClose={() => setIsBackendSettingsOpen(false)} />
       )}
 
       {/* Keyboard Shortcuts Help */}
