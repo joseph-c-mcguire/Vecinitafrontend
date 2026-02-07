@@ -190,6 +190,38 @@ const translations: Translations = {
     en: 'Open Source',
     es: 'Abrir Fuente',
   },
+  dyslexicFont: {
+    en: 'Dyslexic Font',
+    es: 'Fuente para Dislexia',
+  },
+  dyslexicFontMode: {
+    en: 'Dyslexic-friendly font',
+    es: 'Fuente amigable para dislexia',
+  },
+  dyslexicFontDescription: {
+    en: 'Use a font designed to improve readability for people with dyslexia.',
+    es: 'Usa una fuente diseñada para mejorar la legibilidad para personas con dislexia.',
+  },
+  screenReader: {
+    en: 'Screen Reader',
+    es: 'Lector de Pantalla',
+  },
+  screenReaderMode: {
+    en: 'Text-to-speech mode',
+    es: 'Modo de texto a voz',
+  },
+  screenReaderDescription: {
+    en: 'Enable text-to-speech for messages and UI elements.',
+    es: 'Activa texto a voz para mensajes y elementos de la interfaz.',
+  },
+  highlighterMode: {
+    en: 'Highlighter Mode',
+    es: 'Modo Resaltador',
+  },
+  highlighterModeDescription: {
+    en: 'Highlight text on hover to improve reading focus.',
+    es: 'Resalta el texto al pasar el cursor para mejorar el enfoque de lectura.',
+  },
 };
 
 interface LanguageContextType {
@@ -201,7 +233,16 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguage] = useState<Language>('es');
+  const [language, setLanguage] = useState<Language>(() => {
+    // Load from localStorage, default to Spanish
+    const saved = localStorage.getItem('vecinita-language');
+    return (saved as Language) || 'es';
+  });
+
+  // Save to localStorage when language changes
+  React.useEffect(() => {
+    localStorage.setItem('vecinita-language', language);
+  }, [language]);
 
   const t = (key: string): string => {
     return translations[key]?.[language] || key;

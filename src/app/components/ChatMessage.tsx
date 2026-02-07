@@ -3,6 +3,7 @@ import { Bot, User } from 'lucide-react';
 import { SourceCard, Source } from './SourceCard';
 import { MessageFeedback, Feedback } from './MessageFeedback';
 import { useLanguage } from '../context/LanguageContext';
+import { useAccessibility } from '../context/AccessibilityContext';
 
 export interface Message {
   id: string;
@@ -20,7 +21,21 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
   const { t } = useLanguage();
+  const { settings, speak } = useAccessibility();
   const isUser = message.role === 'user';
+
+  // Automatically read message when screen reader is enabled and it's an assistant message
+  React.useEffect(() => {
+    if (settings.screenReader && !isUser) {
+      speak(message.content);
+    }
+  }, [message.id, settings.screenReader]);
+
+  const handleTextClick = () => {
+    if (settings.screenReader) {
+      speak(message.content);
+    }
+  };
 
   return (
     <div
@@ -39,7 +54,12 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
       </div>
       <div className="flex-1 space-y-2 sm:space-y-3 min-w-0">
         <div className="prose prose-sm max-w-none dark:prose-invert">
-          <p className="text-sm sm:text-base text-foreground whitespace-pre-wrap break-words">{message.content}</p>
+          <p
+            className="text-sm sm:text-base text-foreground whitespace-pre-wrap break-words"
+            onClick={handleTextClick}
+          >
+            {message.content}
+          </p>
         </div>
         {message.sources && message.sources.length > 0 && (
           <div className="space-y-2">

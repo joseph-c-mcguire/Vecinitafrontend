@@ -1,0 +1,16 @@
+// Export all components for easy importing
+export { ChatWidget } from './ChatWidget';
+export { ChatMessage } from './ChatMessage';
+export { ThemeToggle } from './ThemeToggle';
+export { LanguageSelector } from './LanguageSelector';
+export { AccessibilityPanel } from './AccessibilityPanel';
+export { BackendSettingsPanel } from './BackendSettingsPanel';
+export { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
+export { SourceCard } from './SourceCard';
+export { MessageFeedback } from './MessageFeedback';
+export { SkipToContent } from './SkipToContent';
+
+// Export types
+export type { Message } from './ChatMessage';
+export type { Source } from './SourceCard';
+export type { Feedback } from './MessageFeedback';
