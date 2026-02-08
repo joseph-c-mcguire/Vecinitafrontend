@@ -180,35 +180,6 @@
   }
 }
 
-/* High Contrast Mode */
-.high-contrast {
-  --background: #000000;
-  --foreground: #ffffff;
-  --card: #000000;
-  --card-foreground: #ffffff;
-  --primary: #00ffff;
-  --primary-foreground: #000000;
-  --border: #ffffff;
-  --muted: #333333;
-  --muted-foreground: #ffffff;
-  --accent: #1a1a1a;
-  --accent-foreground: #ffffff;
-}
-
-.high-contrast.dark {
-  --background: #000000;
-  --foreground: #ffff00;
-  --card: #000000;
-  --card-foreground: #ffff00;
-  --primary: #00ffff;
-  --primary-foreground: #000000;
-  --border: #ffff00;
-  --muted: #1a1a1a;
-  --muted-foreground: #ffff00;
-  --accent: #1a1a1a;
-  --accent-foreground: #ffff00;
-}
-
 /* Reduce Motion Mode */
 .reduce-motion *,
 .reduce-motion *::before,
@@ -217,4 +188,74 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+/* Dyslexic Font Mode */
+.dyslexic-font {
+  font-family: 'Comic Sans MS', 'OpenDyslexic', Arial, sans-serif;
+  letter-spacing: 0.05em;
+  word-spacing: 0.16em;
+  line-height: 1.8 !important;
+}
+
+.dyslexic-font * {
+  font-family: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+}
+
+/* Highlighter Mode */
+.highlighter-mode p:hover,
+.highlighter-mode span:hover,
+.highlighter-mode div:hover {
+  background-color: rgba(255, 255, 0, 0.3) !important;
+  outline: 2px solid #ffeb3b;
+  cursor: pointer;
+}
+
+.highlighter-mode.dark p:hover,
+.highlighter-mode.dark span:hover,
+.highlighter-mode.dark div:hover {
+  background-color: rgba(255, 235, 59, 0.2) !important;
+  outline: 2px solid #ffeb3b;
+}
+
+/* Screen Reader Focus */
+.screen-reader-active *:focus {
+  outline: 3px solid #4DB8B8 !important;
+  outline-offset: 2px;
+}
+
+/* Enhanced High Contrast Light Mode */
+.high-contrast:not(.dark) {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --primary: #0066cc;
+  --primary-foreground: #ffffff;
+  --border: #000000;
+  --muted: #f0f0f0;
+  --muted-foreground: #000000;
+  --accent: #e0e0e0;
+  --accent-foreground: #000000;
+  --destructive: #cc0000;
+  --destructive-foreground: #ffffff;
+}
+
+/* Enhanced High Contrast Dark Mode */
+.high-contrast.dark {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #000000;
+  --card-foreground: #ffffff;
+  --primary: #00d4ff;
+  --primary-foreground: #000000;
+  --border: #ffffff;
+  --muted: #1a1a1a;
+  --muted-foreground: #ffffff;
+  --accent: #2a2a2a;
+  --accent-foreground: #ffffff;
+  --destructive: #ff4444;
+  --destructive-foreground: #000000;
 }

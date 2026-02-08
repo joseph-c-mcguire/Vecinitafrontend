@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Type, Contrast, Minimize2 } from 'lucide-react';
+import { X, Type, Contrast, Minimize2, BookOpen, Volume2, Highlighter } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 
@@ -10,7 +10,15 @@ interface AccessibilityPanelProps {
 
 export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps) {
   const { t } = useLanguage();
-  const { settings, setFontSize, toggleHighContrast, toggleReduceMotion } = useAccessibility();
+  const { 
+    settings, 
+    setFontSize, 
+    toggleHighContrast, 
+    toggleReduceMotion,
+    toggleDyslexicFont,
+    toggleScreenReader,
+    toggleHighlighterMode
+  } = useAccessibility();
 
   if (!isOpen) return null;
 
@@ -129,6 +137,81 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                 </label>
                 <p className="text-xs sm:text-sm text-muted-foreground">
                   {t('reduceMotionDescription') || 'Minimize animations and transitions.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Dyslexic Font */}
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-primary" aria-hidden="true" />
+                <h3 className="text-sm sm:text-base text-foreground">{t('dyslexicFont')}</h3>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent transition-colors">
+                  <span className="text-sm sm:text-base text-foreground">
+                    {t('dyslexicFontMode') || 'Dyslexic font mode'}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.dyslexicFont}
+                    onChange={toggleDyslexicFont}
+                    className="w-5 h-5 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+                    aria-label={t('dyslexicFont')}
+                  />
+                </label>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {t('dyslexicFontDescription') || 'Use a font designed to help with dyslexia.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Screen Reader */}
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center gap-2">
+                <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary" aria-hidden="true" />
+                <h3 className="text-sm sm:text-base text-foreground">{t('screenReader')}</h3>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent transition-colors">
+                  <span className="text-sm sm:text-base text-foreground">
+                    {t('screenReaderMode') || 'Screen reader mode'}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.screenReader}
+                    onChange={toggleScreenReader}
+                    className="w-5 h-5 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+                    aria-label={t('screenReader')}
+                  />
+                </label>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {t('screenReaderDescription') || 'Enable screen reader mode for better accessibility.'}
+                </p>
+              </div>
+            </div>
+
+            {/* Highlighter Mode */}
+            <div className="space-y-2 sm:space-y-3">
+              <div className="flex items-center gap-2">
+                <Highlighter className="w-4 h-4 sm:w-5 sm:h-5 text-primary" aria-hidden="true" />
+                <h3 className="text-sm sm:text-base text-foreground">{t('highlighterMode')}</h3>
+              </div>
+              <div className="space-y-2">
+                <label className="flex items-center justify-between p-2.5 sm:p-3 rounded-lg border border-border bg-background cursor-pointer hover:bg-accent transition-colors">
+                  <span className="text-sm sm:text-base text-foreground">
+                    {t('highlighterMode') || 'Highlighter mode'}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={settings.highlighterMode}
+                    onChange={toggleHighlighterMode}
+                    className="w-5 h-5 rounded border-border text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+                    aria-label={t('highlighterMode')}
+                  />
+                </label>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  {t('highlighterModeDescription') || 'Enable highlighter mode to highlight text.'}
                 </p>
               </div>
             </div>

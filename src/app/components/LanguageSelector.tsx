@@ -2,8 +2,26 @@ import React from 'react';
 import { Languages } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-export function LanguageSelector() {
+interface LanguageSelectorProps {
+  variant?: 'default' | 'compact';
+}
+
+export function LanguageSelector({ variant = 'default' }: LanguageSelectorProps) {
   const { language, setLanguage, t } = useLanguage();
+
+  if (variant === 'compact') {
+    return (
+      <select
+        value={language}
+        onChange={(e) => setLanguage(e.target.value as 'en' | 'es')}
+        className="bg-white/20 text-white border-none rounded px-2 py-1 text-xs cursor-pointer hover:bg-white/30 focus:outline-none focus:ring-2 focus:ring-white/50 transition-all"
+        aria-label={t('language')}
+      >
+        <option value="en" className="text-foreground bg-background">EN</option>
+        <option value="es" className="text-foreground bg-background">ES</option>
+      </select>
+    );
+  }
 
   return (
     <div className="relative">
