@@ -1,0 +1,110 @@
+/**
+ * TypeScript interfaces for Backend Agent Integration
+ * 
+ * Defines types for agent API responses, streaming events, and configurations.
+ */
+
+export interface AgentSource {
+  title: string;
+  url: string;
+  type?: 'document' | 'link' | 'web';
+  isDownload?: boolean;
+  chunkIndex?: number;
+  metadata?: Record<string, unknown>;
+  snippet?: string;
+}
+
+export interface AgentResponse {
+  answer: string;
+  sources: AgentSource[];
+  thread_id?: string;
+  language?: string;
+  model?: string;
+}
+
+export interface StreamEventThinking {
+  type: 'thinking';
+  message: string;
+  toolName?: string;
+}
+
+export interface StreamEventToken {
+  type: 'token';
+  content: string;
+  cumulative?: string;
+}
+
+export interface StreamEventSource {
+  type: 'source';
+  url: string;
+  title: string;
+  source_type?: 'document' | 'link';
+}
+
+export interface StreamEventComplete {
+  type: 'complete';
+  answer: string;
+  sources: AgentSource[];
+  thread_id?: string;
+  plan?: string;
+  metadata?: {
+    model_used?: string;
+    tokens?: number;
+  };
+}
+
+export interface StreamEventClarification {
+  type: 'clarification';
+  message: string;
+  suggestedQuestions?: string[];
+}
+
+export interface StreamEventError {
+  type: 'error';
+  message: string;
+  code?: string;
+}
+
+export type StreamEvent =
+  | StreamEventThinking
+  | StreamEventToken
+  | StreamEventSource
+  | StreamEventComplete
+  | StreamEventClarification
+  | StreamEventError;
+
+export interface AgentConfig {
+  providers: Array<{
+    name: string;
+    models: string[];
+    default: boolean;
+  }>;
+  models: Record<string, string[]>;
+  defaultProvider?: string;
+  defaultModel?: string;
+}
+
+export interface AskQueryParams {
+  question: string;
+  thread_id?: string;
+  lang?: 'en' | 'es';
+  provider?: string;
+  model?: string;
+}
+
+// Type guards for stream events
+export function isThinkingEvent(event: StreamEvent): event is StreamEventThinking {
+  return event.type === 'thinking';
+}
+
+export function isCompleteEvent(event: StreamEvent): event is StreamEventComplete {
+  return event.type === 'complete';
+}
+
+export function isClarificationEvent(event: StreamEvent): event is StreamEventClarification {
+  return event.type === 'clarification';
+}
+
+export function isErrorEvent(event: StreamEvent): event is StreamEventError {
+  return event.type === 'error';
+}

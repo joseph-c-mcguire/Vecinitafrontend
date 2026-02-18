@@ -222,6 +222,18 @@ const translations: Translations = {
     en: 'Highlight text on hover to improve reading focus.',
     es: 'Resalta el texto al pasar el cursor para mejorar el enfoque de lectura.',
   },
+  'assistant.thinking': {
+    en: 'Assistant is thinking...',
+    es: 'El asistente está pensando...',
+  },
+  'error.title': {
+    en: 'Error',
+    es: 'Error',
+  },
+  'error.retry': {
+    en: 'Retry',
+    es: 'Reintentar',
+  },
 };
 
 interface LanguageContextType {

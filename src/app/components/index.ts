@@ -4,11 +4,11 @@ export { ChatMessage } from './ChatMessage';
 export { ThemeToggle } from './ThemeToggle';
 export { LanguageSelector } from './LanguageSelector';
 export { AccessibilityPanel } from './AccessibilityPanel';
-export { BackendSettingsPanel } from './BackendSettingsPanel';
 export { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 export { SourceCard } from './SourceCard';
 export { MessageFeedback } from './MessageFeedback';
 export { SkipToContent } from './SkipToContent';
+export { StreamingIndicator, TypingIndicator } from './StreamingIndicator';
 
 // Export types
 export type { Message } from './ChatMessage';

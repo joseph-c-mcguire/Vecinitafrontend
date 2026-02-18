@@ -52,6 +52,17 @@ Esta versión simplificada **no incluye**:
 
 Todas las preferencias del usuario (tema, idioma, accesibilidad, configuración del backend) se almacenan localmente en `localStorage`. La retroalimentación de mensajes también se guarda en `localStorage`.
 
+## 📚 Documentación
+
+Para más información, consulta nuestros [documentos completos](./docs/INDEX.md):
+
+- **[QUICK_START.md](./docs/guides/QUICK_START.md)** - Guía rápida para usuarios finales
+- **[CHATWIDGET_README.md](./docs/reference/CHATWIDGET_README.md)** - Integración del componente ChatWidget
+- **[CONTRIBUTING.md](./docs/guides/CONTRIBUTING.md)** - Guía de desarrollo
+- **[docs/INDEX.md](./docs/INDEX.md)** - Índice completo de documentación
+
+Para información sobre accesibilidad, consulta [docs/es/ACCESIBILIDAD.md](./docs/es/ACCESIBILIDAD.md).
+
 ## Tecnologías
 
 - **React 18** con TypeScript

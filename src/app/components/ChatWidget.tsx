@@ -1,13 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, MessageSquare, Minimize2, Settings as SettingsIcon } from 'lucide-react';
+import { Send, X, MessageSquare, Minimize2, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAccessibility } from '../context/AccessibilityContext';
+import { useBackendSettings } from '../context/BackendSettingsContext';
+import { useAgentChat } from '../hooks/useAgentChat';
 import { ChatMessage, Message } from './ChatMessage';
 import { Feedback } from './MessageFeedback';
 import { Source } from './SourceCard';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSelector } from './LanguageSelector';
 import { AccessibilityPanel } from './AccessibilityPanel';
+import { StreamingIndicator } from './StreamingIndicator';
 
 interface ChatWidgetProps {
   /**
@@ -61,6 +64,7 @@ export function ChatWidget({
 }: ChatWidgetProps) {
   const { t, language } = useLanguage();
   const { settings: accessibilitySettings } = useAccessibility();
+  const { selectedLLM } = useBackendSettings();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isMinimized, setIsMinimized] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -70,13 +74,28 @@ export function ChatWidget({
     }
     return themeMode;
   });
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isAccessibilityOpen, setIsAccessibilityOpen] = useState(false);
-  const [thinkingMessageIndex, setThinkingMessageIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Use agent chat hook with conversation storage
+  const {
+    messages,
+    isLoading,
+    streamingMessage,
+    error,
+    sendMessage,
+    clearThread,
+    retryLastMessage,
+  } = useAgentChat({
+    language: language as 'en' | 'es',
+    provider: selectedLLM?.provider,
+    model: selectedLLM?.model,
+    onError: (err) => {
+      console.error('Agent error:', err);
+    },
+  });
 
   // Save theme to localStorage
   useEffect(() => {
@@ -85,131 +104,23 @@ export function ChatWidget({
     }
   }, [theme, themeMode]);
 
-  // Initialize welcome message
-  useEffect(() => {
-    const welcomeMsg = customWelcomeMessage || t('welcomeMessage');
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: '0',
-          role: 'assistant',
-          content: welcomeMsg,
-          timestamp: new Date(),
-        },
-      ]);
-    } else {
-      // Update welcome message when language changes
-      setMessages((prev) => {
-        if (prev.length > 0 && prev[0].id === '0') {
-          return [
-            {
-              ...prev[0],
-              content: welcomeMsg,
-            },
-            ...prev.slice(1),
-          ];
-        }
-        return prev;
-      });
-    }
-  }, [language, customWelcomeMessage]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Cycle through thinking messages
-  useEffect(() => {
-    if (!isLoading) {
-      setThinkingMessageIndex(0);
-      return;
-    }
-
-    const thinkingMessages = t('thinkingMessages').split('|');
-    const interval = setInterval(() => {
-      setThinkingMessageIndex((prev) => (prev + 1) % thinkingMessages.length);
-    }, 800);
-
-    return () => clearInterval(interval);
-  }, [isLoading, language]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const getThinkingMessage = () => {
-    const thinkingMessages = t('thinkingMessages').split('|');
-    return thinkingMessages[thinkingMessageIndex] || thinkingMessages[0];
-  };
-
-  // Mock RAG responses with sources
-  const getMockResponse = (userMessage: string): { content: string; sources: Source[] } => {
-    const isSpanish = language === 'es';
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('water') || lowerMessage.includes('agua') || lowerMessage.includes('contamin')) {
-      return {
-        content: isSpanish
-          ? 'La calidad del agua es un tema importante para la salud comunitaria. Según estudios recientes, la contaminación del agua puede provenir de varias fuentes, incluyendo descargas industriales, escorrentía agrícola y sistemas de alcantarillado obsoletos.'
-          : 'Water quality is an important topic for community health. According to recent studies, water contamination can come from various sources including industrial discharge, agricultural runoff, and outdated sewage systems.',
-        sources: [
-          {
-            title: isSpanish ? 'Estándares de Calidad del Agua - EPA' : 'Water Quality Standards - EPA',
-            url: 'https://www.epa.gov/wqs-tech',
-            snippet: isSpanish
-              ? 'Información sobre los estándares de calidad del agua y regulaciones.'
-              : 'Information about water quality standards and regulations.',
-          },
-        ],
-      };
-    }
-    
-    return {
-      content: isSpanish
-        ? 'Gracias por tu pregunta. Puedo ayudarte con temas relacionados con calidad del agua, calidad del aire, cambio climático y recursos comunitarios. ¿Podrías darme más detalles?'
-        : 'Thank you for your question. I can help you with topics related to water quality, air quality, climate change, and community resources. Could you provide more details?',
-      sources: [],
-    };
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
-    const userMessageContent = input;
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: userMessageContent,
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    const userInput = input;
     setInput('');
-    setIsLoading(true);
 
-    setTimeout(() => {
-      const response = getMockResponse(userMessageContent);
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response.content,
-        sources: response.sources,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-      setIsLoading(false);
-    }, 1000);
+    try {
+      await sendMessage(userInput);
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      // Error is handled by useAgentChat hook
+    }
   };
 
   const handleFeedbackSubmit = (feedback: Feedback) => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === feedback.messageId ? { ...msg, feedback } : msg
-      )
-    );
-
+    // Store feedback in localStorage
     const storedFeedback = localStorage.getItem('vecinita_widget_feedback');
     const feedbackData = storedFeedback ? JSON.parse(storedFeedback) : {};
     feedbackData[feedback.messageId] = {
@@ -228,15 +139,12 @@ export function ChatWidget({
   };
 
   const handleNewChat = () => {
-    setMessages([
-      {
-        id: '0',
-        role: 'assistant',
-        content: customWelcomeMessage || t('welcomeMessage'),
-        timestamp: new Date(),
-      },
-    ]);
+    clearThread();
     setInput('');
+  };
+
+  const handleRetry = () => {
+    retryLastMessage();
   };
 
   // Position styles
@@ -332,14 +240,22 @@ export function ChatWidget({
                     onFeedbackSubmit={handleFeedbackSubmit}
                   />
                 ))}
-                {isLoading && (
-                  <div className="flex gap-2 p-3 bg-muted/30" role="status" aria-live="polite">
-                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center shrink-0">
-                      <div className="w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-muted-foreground break-words">{getThinkingMessage()}</p>
-                    </div>
+                {streamingMessage && (
+                  <StreamingIndicator message={streamingMessage} />
+                )}
+                {error && (
+                  <div className="p-4 m-3 bg-destructive/10 border border-destructive rounded-lg">
+                    <p className="text-sm text-destructive font-medium mb-2">
+                      {t('error.title')}
+                    </p>
+                    <p className="text-sm text-muted-foreground mb-3">{error.message}</p>
+                    <button
+                      onClick={handleRetry}
+                      className="text-sm text-primary hover:underline flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      {t('error.retry')}
+                    </button>
                   </div>
                 )}
                 <div ref={messagesEndRef} />
