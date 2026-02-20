@@ -16,7 +16,8 @@ import type {
 // In development with Vite proxy, use /api prefix
 const GATEWAY_URL =
   import.meta.env.VITE_GATEWAY_URL ||
-  (import.meta.env.DEV ? '/api' : 'http://localhost:8002');
+  import.meta.env.VITE_BACKEND_URL ||
+  (import.meta.env.DEV ? '/api' : 'http://localhost:8004/api/v1');
 
 // Timeout configurations
 const REQUEST_TIMEOUT = 30000; // 30 seconds for standard requests
@@ -40,11 +41,26 @@ class AgentServiceClient {
     this.baseUrl = baseUrl;
   }
 
+  private buildEndpointUrl(path: string): URL {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    const normalizedBase = this.baseUrl.endsWith('/')
+      ? this.baseUrl.slice(0, -1)
+      : this.baseUrl;
+
+    if (/^https?:\/\//i.test(normalizedBase)) {
+      return new URL(`${normalizedBase}${normalizedPath}`);
+    }
+
+    const fallbackOrigin =
+      typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    return new URL(`${normalizedBase}${normalizedPath}`, fallbackOrigin);
+  }
+
   /**
    * Ask a question and get a complete response (non-streaming).
    */
   async ask(params: AskQueryParams): Promise<AgentResponse> {
-    const url = new URL(`${this.baseUrl}/ask`);
+    const url = this.buildEndpointUrl('/ask');
 
     // Add query parameters
     url.searchParams.append('question', params.question);
@@ -59,6 +75,9 @@ class AgentServiceClient {
     }
     if (params.model) {
       url.searchParams.append('model', params.model);
+    }
+    if (params.clarification_response) {
+      url.searchParams.append('clarification_response', params.clarification_response);
     }
 
     const controller = new AbortController();
@@ -121,7 +140,7 @@ class AgentServiceClient {
     params: AskQueryParams,
     onEvent: (event: StreamEvent) => void
   ): Promise<void> {
-    const url = new URL(`${this.baseUrl}/ask/stream`);
+    const url = this.buildEndpointUrl('/ask/stream');
 
     // Add query parameters
     url.searchParams.append('question', params.question);
@@ -136,6 +155,9 @@ class AgentServiceClient {
     }
     if (params.model) {
       url.searchParams.append('model', params.model);
+    }
+    if (params.clarification_response) {
+      url.searchParams.append('clarification_response', params.clarification_response);
     }
 
     return new Promise((resolve, reject) => {
@@ -152,18 +174,49 @@ class AgentServiceClient {
       }, STREAM_TIMEOUT);
 
       eventSource.onmessage = (event) => {
+        let data: StreamEvent;
         try {
-          const data = JSON.parse(event.data) as StreamEvent;
-          onEvent(data);
-
-          // Close stream on completion or error
-          if (data.type === 'complete' || data.type === 'error') {
-            clearTimeout(timeoutId);
-            eventSource.close();
-            resolve();
-          }
+          data = JSON.parse(event.data) as StreamEvent;
         } catch (error) {
           console.error('Failed to parse SSE event:', error);
+          return;
+        }
+
+        try {
+          onEvent(data);
+        } catch (callbackError) {
+          clearTimeout(timeoutId);
+          eventSource.close();
+
+          if (callbackError instanceof AgentServiceError) {
+            reject(callbackError);
+            return;
+          }
+
+          reject(
+            new AgentServiceError(
+              callbackError instanceof Error
+                ? callbackError.message
+                : 'Stream callback failed',
+              0,
+              'STREAM_CALLBACK_ERROR'
+            )
+          );
+          return;
+        }
+
+        // Close stream on completion or error
+        if (data.type === 'complete') {
+          clearTimeout(timeoutId);
+          eventSource.close();
+          resolve();
+          return;
+        }
+
+        if (data.type === 'error') {
+          clearTimeout(timeoutId);
+          eventSource.close();
+          reject(new AgentServiceError(data.message, undefined, data.code));
         }
       };
 
@@ -185,7 +238,7 @@ class AgentServiceClient {
    * Get agent configuration (available providers and models).
    */
   async getConfig(): Promise<AgentConfig> {
-    const url = `${this.baseUrl}/ask/config`;
+    const url = this.buildEndpointUrl('/ask/config').toString();
 
     try {
       const response = await fetch(url, {
@@ -221,7 +274,7 @@ class AgentServiceClient {
    */
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/health`, {
+      const response = await fetch(this.buildEndpointUrl('/health').toString(), {
         method: 'GET',
       });
       return response.ok;

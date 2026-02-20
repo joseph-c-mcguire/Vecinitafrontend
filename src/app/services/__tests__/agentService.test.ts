@@ -91,6 +91,21 @@ describe('AgentServiceClient', () => {
       expect(callUrl).toContain('model=llama-3.1');
     });
 
+    it('should support relative proxy base URLs', async () => {
+      const relativeClient = new AgentServiceClient('/api');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await relativeClient.ask({ question: 'hello' });
+
+      const callUrl = String((fetch as any).mock.calls[0][0]);
+      expect(callUrl).toContain('/api/ask');
+      expect(callUrl).toContain('question=hello');
+    });
+
     it('should handle HTTP error', async () => {
       vi.mocked(fetch).mockResolvedValueOnce({
         ok: false,
@@ -169,6 +184,36 @@ describe('AgentServiceClient', () => {
       expect(events.length).toBeGreaterThan(0);
     });
 
+    it('should build stream URL from relative proxy base URL', async () => {
+      let savedEventSource: any = null;
+
+      (globalThis.EventSource as any) = class MockES {
+        onmessage: ((event: MessageEvent) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        url: string;
+
+        constructor(url: string) {
+          this.url = url;
+          savedEventSource = this;
+        }
+
+        close() {}
+      };
+
+      const relativeClient = new AgentServiceClient('/api');
+
+      const streamPromise = relativeClient.askStream({ question: 'test' }, () => {});
+
+      setTimeout(() => {
+        if (savedEventSource?.onmessage) {
+          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        }
+      }, 10);
+
+      await streamPromise;
+      expect(savedEventSource.url).toContain('/api/ask/stream');
+    });
+
     it('should handle malformed SSE data', async () => {
       let savedEventSource: any = null;
       
@@ -235,6 +280,38 @@ describe('AgentServiceClient', () => {
       }, 10);
 
       await expect(streamPromise).rejects.toThrow();
+    });
+
+    it('should reject when stream callback throws AgentServiceError', async () => {
+      let savedEventSource: any = null;
+
+      (globalThis.EventSource as any) = class MockES {
+        onmessage: ((event: MessageEvent) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        url: string;
+
+        constructor(url: string) {
+          this.url = url;
+          savedEventSource = this;
+        }
+
+        close() {}
+      };
+
+      const streamPromise = client.askStream(
+        { question: 'test' },
+        () => {
+          throw new AgentServiceError('Connection failed: incomplete chunked read');
+        }
+      );
+
+      setTimeout(() => {
+        if (savedEventSource?.onmessage) {
+          savedEventSource.onmessage({ data: '{"type":"error","message":"Connection failed: incomplete chunked read"}' });
+        }
+      }, 10);
+
+      await expect(streamPromise).rejects.toThrow(AgentServiceError);
     });
 
     it('should close stream on complete event', async () => {

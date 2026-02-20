@@ -1,12 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, X, MessageSquare, Minimize2, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useAccessibility } from '../context/AccessibilityContext';
-import { useBackendSettings } from '../context/BackendSettingsContext';
+import { useBackendSettings } from '../hooks/useBackendSettings';
 import { useAgentChat } from '../hooks/useAgentChat';
-import { ChatMessage, Message } from './ChatMessage';
+import { ChatMessage } from './ChatMessage';
 import { Feedback } from './MessageFeedback';
-import { Source } from './SourceCard';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSelector } from './LanguageSelector';
 import { AccessibilityPanel } from './AccessibilityPanel';
@@ -57,13 +55,11 @@ export function ChatWidget({
   position = 'bottom-right',
   primaryColor,
   defaultOpen = false,
-  customWelcomeMessage,
   title,
   themeMode = 'auto',
   zIndex = 1000,
 }: ChatWidgetProps) {
   const { t, language } = useLanguage();
-  const { settings: accessibilitySettings } = useAccessibility();
   const { selectedLLM } = useBackendSettings();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -84,9 +80,11 @@ export function ChatWidget({
     messages,
     isLoading,
     streamingMessage,
+    progressMessages,
+    streamProgress,
+    pendingClarification,
     error,
     sendMessage,
-    clearThread,
     retryLastMessage,
   } = useAgentChat({
     language: language as 'en' | 'es',
@@ -136,11 +134,6 @@ export function ChatWidget({
       e.preventDefault();
       handleSubmit(e);
     }
-  };
-
-  const handleNewChat = () => {
-    clearThread();
-    setInput('');
   };
 
   const handleRetry = () => {
@@ -242,6 +235,48 @@ export function ChatWidget({
                 ))}
                 {streamingMessage && (
                   <StreamingIndicator message={streamingMessage} />
+                )}
+                {pendingClarification && (
+                  <div className="mx-3 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                      Action required
+                    </p>
+                    <p className="text-xs text-foreground">{pendingClarification.prompt}</p>
+                    {pendingClarification.questions.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {pendingClarification.questions.map((question, index) => (
+                          <li key={`${index}-${question}`}>{index + 1}. {question}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {isLoading && progressMessages.length > 0 && (
+                  <div className="mx-3 mb-3 rounded-md border bg-muted/40 p-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        {streamProgress.stage} · {streamProgress.percent}%
+                      </p>
+                      {streamProgress.waiting && (
+                        <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          Waiting
+                        </span>
+                      )}
+                    </div>
+                    <div className="mb-2 h-1.5 w-full overflow-hidden rounded bg-muted">
+                      <div
+                        className="h-full rounded bg-primary transition-all"
+                        style={{ width: `${streamProgress.percent}%` }}
+                      />
+                    </div>
+                    <ul className="space-y-1">
+                      {progressMessages.slice(-4).map((item, index) => (
+                        <li key={`${index}-${item}`} className="text-xs text-muted-foreground">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
                 {error && (
                   <div className="p-4 m-3 bg-destructive/10 border border-destructive rounded-lg">

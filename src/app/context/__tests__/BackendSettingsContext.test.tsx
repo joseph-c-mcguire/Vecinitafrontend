@@ -6,7 +6,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { BackendSettingsProvider, useBackendSettings } from '../BackendSettingsContext';
+import { BackendSettingsProvider } from '../BackendSettingsContext';
+import { useBackendSettings } from '../../hooks/useBackendSettings';
 import { agentService } from '../../services/agentService';
 import type { AgentConfig } from '../../types/agent';
 

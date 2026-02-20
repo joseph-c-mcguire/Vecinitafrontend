@@ -26,6 +26,12 @@ export interface StreamEventThinking {
   type: 'thinking';
   message: string;
   toolName?: string;
+  stage?: string;
+  progress?: number;
+  status?: 'working' | 'waiting' | 'error';
+  waiting?: boolean;
+  tool?: string;
+  timestamp?: string;
 }
 
 export interface StreamEventToken {
@@ -50,19 +56,45 @@ export interface StreamEventComplete {
   metadata?: {
     model_used?: string;
     tokens?: number;
+    progress?: number;
+    stage?: string;
   };
+  timestamp?: string;
 }
 
 export interface StreamEventClarification {
   type: 'clarification';
-  message: string;
+  message?: string;
+  questions?: string[];
+  context?: string;
   suggestedQuestions?: string[];
+  stage?: string;
+  progress?: number;
+  waiting?: boolean;
+  timestamp?: string;
 }
 
 export interface StreamEventError {
   type: 'error';
   message: string;
   code?: string;
+  stage?: string;
+  progress?: number;
+  status?: 'error';
+  timestamp?: string;
+}
+
+export interface StreamEventToolEvent {
+  type: 'tool_event';
+  phase: 'start' | 'result' | 'error';
+  tool?: string;
+  message: string;
+  stage?: string;
+  progress?: number;
+  status?: 'working' | 'waiting' | 'error';
+  waiting?: boolean;
+  transient?: boolean;
+  timestamp?: string;
 }
 
 export type StreamEvent =
@@ -71,7 +103,8 @@ export type StreamEvent =
   | StreamEventSource
   | StreamEventComplete
   | StreamEventClarification
-  | StreamEventError;
+  | StreamEventError
+  | StreamEventToolEvent;
 
 export interface AgentConfig {
   providers: Array<{
@@ -90,6 +123,7 @@ export interface AskQueryParams {
   lang?: 'en' | 'es';
   provider?: string;
   model?: string;
+  clarification_response?: string;
 }
 
 // Type guards for stream events

@@ -221,6 +221,64 @@ describe('useAgentChat', () => {
       expect(result.current.threadId).toBe('new-thread-id');
       expect(result.current.threadId).not.toBe(initialThreadId);
     });
+
+    it('should persist clarification event as assistant message', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({
+          type: 'clarification',
+          message: 'Which neighborhood are you asking about?',
+        });
+        onEvent({
+          type: 'complete',
+          answer: 'Please confirm your location so I can narrow results.',
+          sources: [],
+        });
+      });
+
+      const { result } = renderHook(() => useAgentChat());
+
+      await act(async () => {
+        await result.current.sendMessage('Need food assistance');
+      });
+
+      expect(result.current.messages).toHaveLength(3);
+      expect(result.current.messages[1].role).toBe('assistant');
+      expect(result.current.messages[1].content).toContain('Clarification needed:');
+      expect(result.current.messages[2].content).toContain('Please confirm your location');
+    });
+
+    it('should persist tool result summary before final answer', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({
+          type: 'tool_event',
+          phase: 'start',
+          tool: 'db_search',
+          message: 'Searching internal documents...',
+        });
+        onEvent({
+          type: 'tool_event',
+          phase: 'result',
+          tool: 'db_search',
+          message: 'Found 4 relevant documents.',
+        });
+        onEvent({
+          type: 'complete',
+          answer: 'Here are the resources I found.',
+          sources: [],
+        });
+      });
+
+      const { result } = renderHook(() => useAgentChat());
+
+      await act(async () => {
+        await result.current.sendMessage('Find housing aid');
+      });
+
+      expect(result.current.messages).toHaveLength(3);
+      expect(result.current.messages[1].content).toContain('Tool Summary');
+      expect(result.current.messages[1].content).toContain('Db Search');
+      expect(result.current.messages[2].content).toBe('Here are the resources I found.');
+    });
   });
 
   describe('clearThread', () => {
@@ -273,9 +331,7 @@ describe('useAgentChat', () => {
   describe('retryLastMessage', () => {
     it('should resend last user message', async () => {
       vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
-        setTimeout(() => {
-          onEvent({ type: 'complete', answer: 'Success', sources: [] });
-        }, 0);
+        onEvent({ type: 'complete', answer: 'Success', sources: [] });
       });
 
       const { result } = renderHook(() => useAgentChat());
@@ -309,9 +365,7 @@ describe('useAgentChat', () => {
 
     it('should remove last assistant message before retry', async () => {
       vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
-        setTimeout(() => {
-          onEvent({ type: 'complete', answer: 'Retry answer', sources: [] });
-        }, 0);
+        onEvent({ type: 'complete', answer: 'Retry answer', sources: [] });
       });
 
       const { result } = renderHook(() => useAgentChat());

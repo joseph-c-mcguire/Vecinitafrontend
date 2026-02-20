@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useState, useEffect, ReactNode } from 'react';
 import { agentService } from '../services/agentService';
 import type { AgentConfig } from '../types/agent';
 
@@ -9,7 +9,7 @@ interface BackendSettings {
   embeddingModel: string;
 }
 
-interface BackendSettingsContextType {
+export interface BackendSettingsContextType {
   settings: BackendSettings;
   config: AgentConfig | null;
   isLoading: boolean;
@@ -22,7 +22,7 @@ interface BackendSettingsContextType {
   refetchConfig: () => Promise<void>;
 }
 
-const BackendSettingsContext = createContext<BackendSettingsContextType | undefined>(undefined);
+export const BackendSettingsContext = createContext<BackendSettingsContextType | undefined>(undefined);
 
 export function BackendSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<BackendSettings>(() => {
@@ -76,6 +76,14 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
               llmProvider: defaultProvider.name,
               llmModel: defaultProvider.models[0] || '',
             }));
+          } else {
+            const providerModels = data.models?.[settings.llmProvider] ?? [];
+            if (!providerModels.includes(settings.llmModel)) {
+              setSettings(prev => ({
+                ...prev,
+                llmModel: providerModels[0] || '',
+              }));
+            }
           }
         }
       } catch (err) {
@@ -151,12 +159,4 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
       {children}
     </BackendSettingsContext.Provider>
   );
-}
-
-export function useBackendSettings() {
-  const context = useContext(BackendSettingsContext);
-  if (context === undefined) {
-    throw new Error('useBackendSettings must be used within a BackendSettingsProvider');
-  }
-  return context;
 }

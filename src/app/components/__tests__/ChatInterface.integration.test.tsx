@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 // Mock contexts and services
 vi.mock('@/lib/supabase');
-vi.mock('@/app/services/chatService');
+vi.mock('@/app/services/agentService');
 
 // Mock provider component for testing
 const MockProviders = ({ children }: { children: React.ReactNode }) => {

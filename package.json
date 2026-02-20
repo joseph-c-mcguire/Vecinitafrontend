@@ -1,5 +1,5 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "vecinita-frontend",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -68,6 +68,7 @@
     "react-popper": "2.3.0",
     "react-resizable-panels": "2.1.7",
     "react-responsive-masonry": "2.7.1",
+    "react-router-dom": "^6.30.3",
     "react-slick": "0.31.0",
     "recharts": "2.15.2",
     "sonner": "2.0.3",
