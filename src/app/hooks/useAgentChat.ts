@@ -9,7 +9,12 @@ import { useState, useCallback, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { agentService, AgentServiceError } from '../services/agentService';
 import { useConversationStorage, type Message } from './useConversationStorage';
-import type { StreamEvent, AgentSource } from '../types/agent';
+import type {
+  StreamEvent,
+  AgentSource,
+  AskQueryParams,
+  AgentResponse,
+} from '../types/agent';
 
 interface UseAgentChatOptions {
   initialThreadId?: string;
@@ -17,6 +22,10 @@ interface UseAgentChatOptions {
   provider?: string;
   model?: string;
   onError?: (error: AgentServiceError) => void;
+  service?: {
+    askStream: (params: AskQueryParams, onEvent: (event: StreamEvent) => void) => Promise<void>;
+    ask: (params: AskQueryParams) => Promise<AgentResponse>;
+  };
 }
 
 interface StreamProgressState {
@@ -33,6 +42,7 @@ interface PendingClarificationState {
 }
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
+  const serviceClient = options.service || agentService;
   const [threadId, setThreadId] = useState<string>(
     options.initialThreadId || uuidv4()
   );
@@ -148,6 +158,14 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       try {
         const activeClarification = pendingClarification;
+        const requestParams: AskQueryParams = {
+          question: activeClarification?.originalQuestion || question,
+          thread_id: threadId,
+          lang: options.language,
+          provider: options.provider,
+          model: options.model,
+          clarification_response: activeClarification ? question : undefined,
+        };
         let assistantContent = '';
         let assistantSources: AgentSource[] = [];
         let newThreadId = threadId;
@@ -181,15 +199,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             .join(' ');
 
         // Stream response from agent
-        await agentService.askStream(
-          {
-            question: activeClarification?.originalQuestion || question,
-            thread_id: threadId,
-            lang: options.language,
-            provider: options.provider,
-            model: options.model,
-            clarification_response: activeClarification ? question : undefined,
-          },
+        await serviceClient.askStream(
+          requestParams,
           (event: StreamEvent) => {
             switch (event.type) {
               case 'thinking':
@@ -327,10 +338,40 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         // Save to localStorage (will use updated threadId due to useEffect)
         storage.saveMessages(finalMessages);
       } catch (err) {
-        const agentError =
+        let agentError =
           err instanceof AgentServiceError
             ? err
             : new AgentServiceError('An unexpected error occurred');
+
+        try {
+          const fallbackResponse = await serviceClient.ask(requestParams);
+          let fallbackMessages = workingMessages;
+
+          if (fallbackResponse.answer.trim()) {
+            const fallbackAssistantMessage: Message = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: fallbackResponse.answer,
+              sources: mapSources(fallbackResponse.sources || []),
+              timestamp: new Date(),
+            };
+            fallbackMessages = [...fallbackMessages, fallbackAssistantMessage];
+            setMessages(fallbackMessages);
+          }
+
+          if (fallbackResponse.thread_id && fallbackResponse.thread_id !== threadId) {
+            setThreadId(fallbackResponse.thread_id);
+          }
+
+          setError(null);
+          storage.saveMessages(fallbackMessages);
+          return;
+        } catch (fallbackError) {
+          agentError =
+            fallbackError instanceof AgentServiceError
+              ? fallbackError
+              : new AgentServiceError('An unexpected error occurred');
+        }
 
         setError(agentError);
         if (options.onError) {
@@ -368,6 +409,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       options.language,
       options.provider,
       options.model,
+      serviceClient,
       options.onError,
     ]
   );

@@ -11,7 +11,20 @@ import { agentService, AgentServiceError } from '../../services/agentService';
 import type { StreamEvent } from '../../types/agent';
 
 // Mock dependencies
-vi.mock('../../services/agentService');
+vi.mock('../../services/agentService', async () => {
+  const actual = await vi.importActual<typeof import('../../services/agentService')>('../../services/agentService');
+
+  return {
+    ...actual,
+    agentService: {
+      ...actual.agentService,
+      ask: vi.fn(),
+      askStream: vi.fn(),
+      getConfig: vi.fn(),
+      healthCheck: vi.fn(),
+    },
+  };
+});
 vi.mock('../useConversationStorage', () => ({
   useConversationStorage: () => ({
     saveMessages: vi.fn(),
@@ -31,6 +44,7 @@ vi.mock('uuid', () => ({
 describe('useAgentChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(console, 'debug').mockImplementation(() => {});
   });
 
   afterEach(() => {

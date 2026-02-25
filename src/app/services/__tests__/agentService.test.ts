@@ -106,6 +106,21 @@ describe('AgentServiceClient', () => {
       expect(callUrl).toContain('question=hello');
     });
 
+    it('should normalize absolute base URL without API prefix', async () => {
+      const absoluteClient = new AgentServiceClient('http://localhost:8004');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await absoluteClient.ask({ question: 'hello' });
+
+      const callUrl = String((fetch as any).mock.calls[0][0]);
+      expect(callUrl).toContain('http://localhost:8004/api/v1/ask');
+      expect(callUrl).toContain('question=hello');
+    });
+
     it('should handle HTTP error', async () => {
       vi.mocked(fetch).mockResolvedValueOnce({
         ok: false,
@@ -214,8 +229,40 @@ describe('AgentServiceClient', () => {
       expect(savedEventSource.url).toContain('/api/ask/stream');
     });
 
+    it('should normalize stream URL when absolute base has no API prefix', async () => {
+      let savedEventSource: any = null;
+
+      (globalThis.EventSource as any) = class MockES {
+        onmessage: ((event: MessageEvent) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        url: string;
+
+        constructor(url: string) {
+          this.url = url;
+          savedEventSource = this;
+        }
+
+        close() {}
+      };
+
+      const absoluteClient = new AgentServiceClient('http://localhost:8004');
+      const streamPromise = absoluteClient.askStream({ question: 'test' }, () => {});
+
+      setTimeout(() => {
+        if (savedEventSource?.onmessage) {
+          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        }
+      }, 10);
+
+      await streamPromise;
+      expect(savedEventSource.url).toContain('http://localhost:8004/api/v1/ask/stream');
+    });
+
     it('should handle malformed SSE data', async () => {
       let savedEventSource: any = null;
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       
       (globalThis.EventSource as any) = class MockES {
         onmessage: ((event: MessageEvent) => void) | null = null;
@@ -250,6 +297,8 @@ describe('AgentServiceClient', () => {
 
       // Should only have 1 valid event
       expect(events.length).toBeGreaterThan(0);
+      expect(consoleErrorSpy).toHaveBeenCalled();
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle stream error', async () => {

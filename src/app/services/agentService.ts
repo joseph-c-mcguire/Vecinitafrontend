@@ -23,6 +23,39 @@ const GATEWAY_URL =
 const REQUEST_TIMEOUT = 30000; // 30 seconds for standard requests
 const STREAM_TIMEOUT = 120000; // 120 seconds for streaming
 
+function normalizeApiBaseUrl(baseUrl: string): string {
+  const normalizedInput = (baseUrl || '').trim().replace(/\/+$/, '');
+  if (!normalizedInput) {
+    return '/api';
+  }
+
+  const ensureApiPrefix = (pathname: string): string => {
+    const sanitizedPath = pathname.replace(/\/+$/, '');
+
+    if (!sanitizedPath || sanitizedPath === '/') {
+      return '/api/v1';
+    }
+
+    if (sanitizedPath === '/api') {
+      return '/api/v1';
+    }
+
+    return sanitizedPath;
+  };
+
+  if (/^https?:\/\//i.test(normalizedInput)) {
+    try {
+      const parsed = new URL(normalizedInput);
+      parsed.pathname = ensureApiPrefix(parsed.pathname);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return normalizedInput;
+    }
+  }
+
+  return normalizedInput;
+}
+
 export class AgentServiceError extends Error {
   constructor(
     message: string,
@@ -38,7 +71,7 @@ class AgentServiceClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = GATEWAY_URL) {
-    this.baseUrl = baseUrl;
+    this.baseUrl = normalizeApiBaseUrl(baseUrl);
   }
 
   private buildEndpointUrl(path: string): URL {
