@@ -19,6 +19,41 @@ const GATEWAY_URL =
   import.meta.env.VITE_BACKEND_URL ||
   (import.meta.env.DEV ? '/api' : 'http://localhost:8004/api/v1');
 
+function resolveGatewayUrl(rawUrl: string): string {
+  if (typeof window === 'undefined') {
+    return rawUrl;
+  }
+
+  const currentHost = window.location.hostname;
+  const isCurrentHostLocal =
+    currentHost === 'localhost' ||
+    currentHost === '127.0.0.1' ||
+    currentHost === '::1';
+
+  if (isCurrentHostLocal) {
+    return rawUrl;
+  }
+
+  try {
+    const parsed = new URL(rawUrl);
+    const isConfiguredLocal =
+      parsed.hostname === 'localhost' ||
+      parsed.hostname === '127.0.0.1' ||
+      parsed.hostname === '::1';
+    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
+    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
+
+    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
+      parsed.hostname = currentHost;
+      return parsed.toString();
+    }
+  } catch {
+    return rawUrl;
+  }
+
+  return rawUrl;
+}
+
 // Timeout configurations
 const REQUEST_TIMEOUT = 30000; // 30 seconds for standard requests
 const STREAM_TIMEOUT = 120000; // 120 seconds for streaming
@@ -84,7 +119,7 @@ class AgentServiceClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = GATEWAY_URL) {
-    this.baseUrl = normalizeApiBaseUrl(baseUrl);
+    this.baseUrl = normalizeApiBaseUrl(resolveGatewayUrl(baseUrl));
   }
 
   private debugLog(message: string, data?: unknown): void {
@@ -351,34 +386,49 @@ class AgentServiceClient {
    */
   async getConfig(): Promise<AgentConfig> {
     const url = this.buildEndpointUrl('/ask/config').toString();
+    const CONFIG_RETRY_ATTEMPTS = 3;
+    const CONFIG_RETRY_DELAY_MS = 800;
+    let lastError: unknown;
 
-    try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
+    for (let attempt = 1; attempt <= CONFIG_RETRY_ATTEMPTS; attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
 
-      if (!response.ok) {
-        throw new AgentServiceError(
-          'Failed to fetch agent configuration',
-          response.status
-        );
+        if (!response.ok) {
+          throw new AgentServiceError(
+            'Failed to fetch agent configuration',
+            response.status
+          );
+        }
+
+        return await response.json();
+      } catch (error) {
+        lastError = error;
+        const isLastAttempt = attempt === CONFIG_RETRY_ATTEMPTS;
+        const isRetriableNetworkError = !(error instanceof AgentServiceError);
+
+        if (isLastAttempt || !isRetriableNetworkError) {
+          break;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, CONFIG_RETRY_DELAY_MS));
       }
-
-      return await response.json();
-    } catch (error) {
-      if (error instanceof AgentServiceError) {
-        throw error;
-      }
-
-      throw new AgentServiceError(
-        'Failed to connect to agent service',
-        0,
-        'NETWORK_ERROR'
-      );
     }
+
+    if (lastError instanceof AgentServiceError) {
+      throw lastError;
+    }
+
+    throw new AgentServiceError(
+      'Failed to connect to agent service',
+      0,
+      'NETWORK_ERROR'
+    );
   }
 
   /**

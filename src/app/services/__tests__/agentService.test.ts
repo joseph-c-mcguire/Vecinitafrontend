@@ -122,6 +122,78 @@ describe('AgentServiceClient', () => {
       expect(callUrl).toContain('question=hello');
     });
 
+    it('should rewrite localhost API base to public host in browser context', async () => {
+      const locationSpy = vi
+        .spyOn(window, 'location', 'get')
+        .mockReturnValue({
+          hostname: '34.55.88.67',
+          origin: 'http://34.55.88.67:15173',
+        } as Location);
+
+      const publicClient = new AgentServiceClient('http://localhost:18004/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await publicClient.ask({ question: 'hello' });
+
+      const callUrl = String((fetch as any).mock.calls[0][0]);
+      expect(callUrl).toContain('http://34.55.88.67:18004/api/v1/ask');
+      expect(callUrl).toContain('question=hello');
+
+      locationSpy.mockRestore();
+    });
+
+    it('should keep localhost API base when browser host is localhost', async () => {
+      const locationSpy = vi
+        .spyOn(window, 'location', 'get')
+        .mockReturnValue({
+          hostname: 'localhost',
+          origin: 'http://localhost:15173',
+        } as Location);
+
+      const localClient = new AgentServiceClient('http://localhost:18004/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await localClient.ask({ question: 'hello' });
+
+      const callUrl = String((fetch as any).mock.calls[0][0]);
+      expect(callUrl).toContain('http://localhost:18004/api/v1/ask');
+      expect(callUrl).toContain('question=hello');
+
+      locationSpy.mockRestore();
+    });
+
+    it('should rewrite stale public gateway host to current browser host', async () => {
+      const locationSpy = vi
+        .spyOn(window, 'location', 'get')
+        .mockReturnValue({
+          hostname: '34.170.200.11',
+          origin: 'http://34.170.200.11:15173',
+        } as Location);
+
+      const staleHostClient = new AgentServiceClient('http://34.55.88.67:18004/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await staleHostClient.ask({ question: 'hello' });
+
+      const callUrl = String((fetch as any).mock.calls[0][0]);
+      expect(callUrl).toContain('http://34.170.200.11:18004/api/v1/ask');
+      expect(callUrl).toContain('question=hello');
+
+      locationSpy.mockRestore();
+    });
+
     it('should handle HTTP error', async () => {
       vi.mocked(fetch).mockResolvedValueOnce({
         ok: false,
@@ -455,6 +527,25 @@ describe('AgentServiceClient', () => {
       vi.mocked(fetch).mockRejectedValueOnce(new Error('Network error'));
 
       await expect(client.getConfig()).rejects.toThrow(AgentServiceError);
+    });
+
+    it('should retry getConfig on transient network error', async () => {
+      const mockConfig: AgentConfig = {
+        providers: [{ name: 'deepseek', models: ['deepseek-chat'], default: true }],
+        models: { deepseek: ['deepseek-chat'] },
+      };
+
+      vi.mocked(fetch)
+        .mockRejectedValueOnce(new Error('Connection reset'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockConfig,
+        } as Response);
+
+      const result = await client.getConfig();
+
+      expect(result).toEqual(mockConfig);
+      expect(fetch).toHaveBeenCalledTimes(2);
     });
   });
 
