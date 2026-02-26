@@ -9,6 +9,7 @@ Este documento describe la infraestructura de pruebas y cómo ejecutar las prueb
 - **jsdom**: Implementación DOM para Node.js
 - **MSW (Mock Service Worker)**: Simulación de API para pruebas de integración
 - **@testing-library/user-event**: Simula interacciones de usuario
+- **Playwright**: Pruebas E2E de flujos completos en navegador (UI real)
 
 ## Ejecutar Pruebas
 
@@ -31,6 +32,28 @@ npm run test:ui
 ```bash
 npm run test:coverage
 ```
+
+### Ejecutar pruebas E2E (Playwright)
+```bash
+# Instalar navegadores de Playwright (primera vez)
+npx playwright install
+
+# Ejecutar suite E2E
+npm run test:e2e
+
+# Ejecutar con UI interactiva
+npm run test:e2e:ui
+```
+
+### Variables de entorno para E2E Admin
+Las pruebas E2E de administración usan credenciales por entorno:
+
+```bash
+E2E_ADMIN_EMAIL=<admin-email>
+E2E_ADMIN_PASSWORD=<admin-password>
+```
+
+Opcionalmente, también aceptan `VITE_DEV_ADMIN_EMAIL` y `VITE_DEV_ADMIN_PASSWORD`.
 
 ## Estructura de Pruebas
 
@@ -210,6 +233,8 @@ Las pruebas se ejecutan automáticamente en:
 - Pull requests
 - Pushes a la rama principal
 - Verificaciones pre-despliegue
+
+En CI, la suite E2E usa `npm run test:e2e`.
 
 ## Recursos Adicionales
 

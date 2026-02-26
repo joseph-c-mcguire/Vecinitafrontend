@@ -11,6 +11,7 @@ The **ChatWidget** is a fully self-contained, embeddable chat component that can
 ✅ **Responsive** - Works on mobile and desktop  
 ✅ **Self-Contained** - Manages its own state independently  
 ✅ **Source Citations** - RAG-powered responses with source links  
+✅ **Markdown Answers** - Assistant responses render markdown safely  
 ✅ **Feedback System** - Users can rate responses  
 
 ---

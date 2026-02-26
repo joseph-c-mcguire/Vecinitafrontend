@@ -3,6 +3,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import DocumentsDashboard from '../DocumentsDashboard';
 
+vi.mock('../../context/LanguageContext', () => ({
+  useLanguage: () => ({ t: (key: string) => ({
+    documentsTitle: 'Documents',
+    documentsSubtitle: 'Community resources and reference materials available to everyone.',
+    docsTotalSources: 'Community Sources',
+    docsTotalTopics: 'Topics',
+    docsVisibleResources: 'Visible Resources',
+    docsResources: 'Resources',
+    docsSearchPlaceholder: 'Search resources…',
+    docsTopics: 'Topics',
+    docsClearFilters: 'Clear filters',
+    docsNoTopics: 'No topics available yet.',
+    docsSourcesLabel: 'sources',
+    docsResource: 'Resource',
+    docsActions: 'Actions',
+    docsNoResults: 'No resources match your filters.',
+    docsOpenSource: 'Open source',
+    docsDownload: 'Download',
+    docsLoading: 'Loading resources…',
+    docsLoadFailed: 'Failed to load resources',
+    docsUnknownError: 'Unknown error',
+    docsDownloadError: 'Unable to resolve a download link',
+    docsNoDownloadAvailable: 'This resource does not have a downloadable file.',
+    docsDownloadFailed: 'Failed to download resource',
+  }[key] ?? key) }),
+}));
+
 describe('DocumentsDashboard integration', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -16,33 +43,21 @@ describe('DocumentsDashboard integration', () => {
           return Promise.resolve({
             ok: true,
             json: async () => ({
-              total_chunks: 12,
-              unique_sources: 2,
-              avg_chunk_size: 320,
-              embedding_model: 'sentence-transformers/all-MiniLM-L6-v2',
-              embedding_dimension: 384,
               sources: [
                 {
                   url: 'https://example.org/a',
                   title: 'Example Source A',
                   source_domain: 'example.org',
-                  total_chunks: 8,
+                  tags: ['housing'],
                 },
                 {
                   url: 'https://example.org/b',
                   title: 'Example Source B',
                   source_domain: 'example.org',
-                  total_chunks: 4,
+                  tags: ['benefits'],
                 },
               ],
             }),
-          } as Response);
-        }
-
-        if (url.includes('/documents/chunk-statistics')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ rows: [] }),
           } as Response);
         }
 
@@ -70,19 +85,22 @@ describe('DocumentsDashboard integration', () => {
     );
   });
 
-  it('renders chunk/source stats and source rows from API data', async () => {
+  it('renders community resources and topic filters from API data', async () => {
     render(<DocumentsDashboard />);
 
     await waitFor(() => {
       expect(screen.getByText('Documents')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('12')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
+    expect(screen.getByText('Community Sources')).toBeInTheDocument();
+    expect(screen.getByText('Visible Resources')).toBeInTheDocument();
     expect(screen.getByText('Example Source A')).toBeInTheDocument();
     expect(screen.getByText('Example Source B')).toBeInTheDocument();
     expect(screen.getByText('https://example.org/a')).toBeInTheDocument();
     expect(screen.getByText('housing (2)')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'housing (2)' })).toBeInTheDocument();
+    expect(screen.queryByText('Total Chunks')).not.toBeInTheDocument();
+    expect(screen.queryByText('Embedding Model')).not.toBeInTheDocument();
     expect(screen.queryByText('Download')).not.toBeInTheDocument();
   });
 });

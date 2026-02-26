@@ -15,6 +15,26 @@ vi.mock('../../context/AccessibilityContext', () => ({
 }));
 
 describe('ChatMessage source attribution', () => {
+  it('renders assistant markdown content safely', () => {
+    render(
+      <ChatMessage
+        message={{
+          id: 'assistant-md-1',
+          role: 'assistant',
+          content: '## Support Links\n\n- **Housing**\n- [Community Center](https://example.org/community)',
+          timestamp: new Date(),
+          sources: [],
+        }}
+      />
+    );
+
+    expect(screen.getByText('Support Links')).toBeInTheDocument();
+    expect(screen.getByText('Housing')).toBeInTheDocument();
+    const markdownLink = screen.getByRole('link', { name: 'Community Center' });
+    expect(markdownLink).toHaveAttribute('href', 'https://example.org/community');
+    expect(markdownLink).toHaveAttribute('target', '_blank');
+  });
+
   it('renders source cards linked to original URLs', () => {
     render(
       <ChatMessage

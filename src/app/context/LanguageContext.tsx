@@ -234,6 +234,94 @@ const translations: Translations = {
     en: 'Retry',
     es: 'Reintentar',
   },
+  documentsTitle: {
+    en: 'Documents',
+    es: 'Documentos',
+  },
+  documentsSubtitle: {
+    en: 'Community resources and reference materials available to everyone.',
+    es: 'Recursos comunitarios y materiales de referencia disponibles para todas las personas.',
+  },
+  docsTotalSources: {
+    en: 'Community Sources',
+    es: 'Fuentes Comunitarias',
+  },
+  docsTotalTopics: {
+    en: 'Topics',
+    es: 'Temas',
+  },
+  docsVisibleResources: {
+    en: 'Visible Resources',
+    es: 'Recursos Visibles',
+  },
+  docsResources: {
+    en: 'Resources',
+    es: 'Recursos',
+  },
+  docsSearchPlaceholder: {
+    en: 'Search resources…',
+    es: 'Buscar recursos…',
+  },
+  docsTopics: {
+    en: 'Topics',
+    es: 'Temas',
+  },
+  docsClearFilters: {
+    en: 'Clear filters',
+    es: 'Limpiar filtros',
+  },
+  docsNoTopics: {
+    en: 'No topics available yet.',
+    es: 'Aún no hay temas disponibles.',
+  },
+  docsSourcesLabel: {
+    en: 'sources',
+    es: 'fuentes',
+  },
+  docsResource: {
+    en: 'Resource',
+    es: 'Recurso',
+  },
+  docsActions: {
+    en: 'Actions',
+    es: 'Acciones',
+  },
+  docsNoResults: {
+    en: 'No resources match your filters.',
+    es: 'Ningún recurso coincide con tus filtros.',
+  },
+  docsOpenSource: {
+    en: 'Open source',
+    es: 'Abrir fuente',
+  },
+  docsDownload: {
+    en: 'Download',
+    es: 'Descargar',
+  },
+  docsLoading: {
+    en: 'Loading resources…',
+    es: 'Cargando recursos…',
+  },
+  docsLoadFailed: {
+    en: 'Failed to load resources',
+    es: 'Error al cargar recursos',
+  },
+  docsUnknownError: {
+    en: 'Unknown error',
+    es: 'Error desconocido',
+  },
+  docsDownloadError: {
+    en: 'Unable to resolve a download link',
+    es: 'No se pudo resolver un enlace de descarga',
+  },
+  docsNoDownloadAvailable: {
+    en: 'This resource does not have a downloadable file.',
+    es: 'Este recurso no tiene un archivo descargable.',
+  },
+  docsDownloadFailed: {
+    en: 'Failed to download resource',
+    es: 'Error al descargar el recurso',
+  },
 };
 
 interface LanguageContextType {

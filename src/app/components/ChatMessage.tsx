@@ -1,5 +1,7 @@
 import React from 'react';
 import { Bot, User } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { SourceCard } from './SourceCard';
 import { MessageFeedback, Feedback } from './MessageFeedback';
 import { useLanguage } from '../context/LanguageContext';
@@ -53,6 +55,36 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
               onClick={handleTextClick}
             >
               {message.content}
+            </div>
+          ) : !isUser ? (
+            <div className="text-sm sm:text-base text-foreground break-words" onClick={handleTextClick}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
+                  li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
+                  code: ({ children }) => (
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs sm:text-sm">{children}</code>
+                  ),
+                  pre: ({ children }) => (
+                    <pre className="mb-2 overflow-x-auto rounded-md border bg-background/60 p-3 text-xs sm:text-sm">{children}</pre>
+                  ),
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline break-all"
+                    >
+                      {children}
+                    </a>
+                  ),
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
             </div>
           ) : (
             <p

@@ -89,6 +89,7 @@ describe('AgentServiceClient', () => {
       expect(callUrl).toContain('lang=es');
       expect(callUrl).toContain('provider=groq');
       expect(callUrl).toContain('model=llama-3.1');
+      expect(callUrl).not.toContain('/ask/question');
     });
 
     it('should support relative proxy base URLs', async () => {
@@ -227,6 +228,7 @@ describe('AgentServiceClient', () => {
 
       await streamPromise;
       expect(savedEventSource.url).toContain('/api/ask/stream');
+      expect(savedEventSource.url).not.toContain('/ask/question');
     });
 
     it('should normalize stream URL when absolute base has no API prefix', async () => {

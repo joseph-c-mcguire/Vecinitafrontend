@@ -55,7 +55,7 @@ describe('AdminDashboard integration', () => {
       ],
       total: 1,
     });
-    mockAddSource.mockResolvedValue({ status: 'queued', url: 'https://example.com', depth: 1, tags: ['housing'] });
+    mockAddSource.mockResolvedValue({ status: 'completed', url: 'https://example.com', depth: 1, tags: ['housing'], chunks_inserted: 3, chunks_total: 3 });
     mockUpdateSourceTags.mockResolvedValue({ status: 'updated', url: 'https://example.com', tags: ['housing', 'food'], chunks_updated: 2 });
   });
 

@@ -6,6 +6,7 @@ Asistente de información ambiental y comunitaria bilingüe (Español/Inglés) c
 
 ### ✨ Funcionalidad Principal
 - **Chatbot RAG** con atribución de fuentes y citaciones
+- **Renderizado Markdown** en respuestas del asistente (listas, enlaces, código)
 - **Bilingüe** (Español/Inglés) con selector de idioma
 - **Idioma predeterminado**: Español
 - **Sistema de retroalimentación** para respuestas del chat (👍/👎 con comentarios opcionales)
@@ -132,6 +133,13 @@ npm run dev
 
 # Compilar para producción
 npm run build
+
+# Pruebas unitarias/integración
+npm run test
+
+# Pruebas E2E (Playwright)
+npx playwright install
+npm run test:e2e
 ```
 
 ## Estructura del Proyecto

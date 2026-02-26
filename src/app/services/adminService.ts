@@ -91,6 +91,9 @@ export interface AddSourceResult {
   url: string;
   depth: number;
   tags?: string[];
+  chunks_total?: number;
+  chunks_inserted?: number;
+  job_id?: string;
 }
 
 export async function addSource(url: string, depth = 1, tags: string[] = []): Promise<AddSourceResult> {

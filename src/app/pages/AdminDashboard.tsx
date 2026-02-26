@@ -163,8 +163,15 @@ function SourcesTab() {
     setMessage(null);
     try {
       const normalizedTags = normalizeTagsFromInput(tagsText);
-      await addSource(url.trim(), depth, normalizedTags);
-      setMessage({ text: `Queued: ${url}`, ok: true });
+      const result = await addSource(url.trim(), depth, normalizedTags);
+      if (result.status === 'completed') {
+        setMessage({
+          text: `Added source and indexed ${result.chunks_inserted ?? 0} chunks.`,
+          ok: true,
+        });
+      } else {
+        setMessage({ text: `Queued: ${url}`, ok: true });
+      }
       setUrl('');
       setTagsText('');
       await load();
