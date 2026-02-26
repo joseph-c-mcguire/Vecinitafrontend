@@ -45,6 +45,7 @@ describe('useAgentChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'debug').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
@@ -215,6 +216,56 @@ describe('useAgentChat', () => {
       });
     });
 
+    it('should fallback to non-stream ask when stream fails', async () => {
+      vi.mocked(agentService.askStream).mockRejectedValue(
+        new AgentServiceError('Stream connection failed', 0, 'STREAM_ERROR')
+      );
+      vi.mocked(agentService.ask).mockResolvedValue({
+        answer: 'Recovered via non-stream fallback',
+        sources: [],
+        thread_id: 'thread-fallback-1',
+      });
+
+      const { result } = renderHook(() => useAgentChat());
+
+      await act(async () => {
+        await result.current.sendMessage('Need help');
+      });
+
+      expect(agentService.ask).toHaveBeenCalled();
+      expect(result.current.error).toBeNull();
+      expect(result.current.messages[result.current.messages.length - 1].content).toBe(
+        'Recovered via non-stream fallback'
+      );
+    });
+
+    it('should fallback to non-stream ask when stream completes with empty answer', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({
+          type: 'complete',
+          answer: '   ',
+          sources: [],
+          thread_id: 'thread-empty-stream',
+        });
+      });
+      vi.mocked(agentService.ask).mockResolvedValue({
+        answer: 'Recovered after empty stream',
+        sources: [],
+        thread_id: 'thread-empty-stream',
+      });
+
+      const { result } = renderHook(() => useAgentChat());
+
+      await act(async () => {
+        await result.current.sendMessage('Need resources');
+      });
+
+      expect(agentService.ask).toHaveBeenCalled();
+      expect(result.current.messages[result.current.messages.length - 1].content).toBe(
+        'Recovered after empty stream'
+      );
+    });
+
     it('should update thread ID from response', async () => {
       vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
         onEvent({
@@ -310,6 +361,9 @@ describe('useAgentChat', () => {
     it('should clear error state', async () => {
       vi.mocked(agentService.askStream).mockRejectedValue(
         new Error('Test error')
+      );
+      vi.mocked(agentService.ask).mockRejectedValue(
+        new AgentServiceError('Fallback failed', 500, 'FALLBACK_FAILED')
       );
 
       const { result } = renderHook(() => useAgentChat());

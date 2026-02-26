@@ -22,6 +22,19 @@ const GATEWAY_URL =
 // Timeout configurations
 const REQUEST_TIMEOUT = 30000; // 30 seconds for standard requests
 const STREAM_TIMEOUT = 120000; // 120 seconds for streaming
+const STREAM_FIRST_EVENT_TIMEOUT = 15000;
+
+const isAgentDebugEnabled = (): boolean => {
+  if ((import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true') {
+    return true;
+  }
+
+  if (typeof window !== 'undefined' && window.localStorage.getItem('vecinita_debug_chat') === '1') {
+    return true;
+  }
+
+  return false;
+};
 
 function normalizeApiBaseUrl(baseUrl: string): string {
   const normalizedInput = (baseUrl || '').trim().replace(/\/+$/, '');
@@ -72,6 +85,19 @@ class AgentServiceClient {
 
   constructor(baseUrl: string = GATEWAY_URL) {
     this.baseUrl = normalizeApiBaseUrl(baseUrl);
+  }
+
+  private debugLog(message: string, data?: unknown): void {
+    if (!isAgentDebugEnabled()) {
+      return;
+    }
+
+    if (data === undefined) {
+      console.info(`[agentService] ${message}`);
+      return;
+    }
+
+    console.info(`[agentService] ${message}`, data);
   }
 
   private buildEndpointUrl(path: string): URL {
@@ -206,6 +232,35 @@ class AgentServiceClient {
         );
       }, STREAM_TIMEOUT);
 
+      let firstEventReceived = false;
+      let firstEventTimeoutId: ReturnType<typeof setTimeout> | null = null;
+      let eventCount = 0;
+      const clearFirstEventTimeout = () => {
+        if (firstEventTimeoutId) {
+          clearTimeout(firstEventTimeoutId);
+          firstEventTimeoutId = null;
+        }
+      };
+
+      firstEventTimeoutId = setTimeout(() => {
+        if (firstEventReceived) {
+          return;
+        }
+        this.debugLog('askStream:first_event_timeout', {
+          thread_id: params.thread_id,
+          questionLength: (params.question || '').length,
+        });
+        clearTimeout(timeoutId);
+        eventSource.close();
+        reject(
+          new AgentServiceError(
+            'Stream stalled before first event',
+            408,
+            'STREAM_STALLED'
+          )
+        );
+      }, STREAM_FIRST_EVENT_TIMEOUT);
+
       eventSource.onmessage = (event) => {
         let data: StreamEvent;
         try {
@@ -215,10 +270,21 @@ class AgentServiceClient {
           return;
         }
 
+        eventCount += 1;
+        if (!firstEventReceived) {
+          firstEventReceived = true;
+          clearFirstEventTimeout();
+          this.debugLog('askStream:first_event_received', {
+            thread_id: params.thread_id,
+            eventCount,
+          });
+        }
+
         try {
           onEvent(data);
         } catch (callbackError) {
           clearTimeout(timeoutId);
+          clearFirstEventTimeout();
           eventSource.close();
 
           if (callbackError instanceof AgentServiceError) {
@@ -241,13 +307,19 @@ class AgentServiceClient {
         // Close stream on completion or error
         if (data.type === 'complete') {
           clearTimeout(timeoutId);
+          clearFirstEventTimeout();
           eventSource.close();
+          this.debugLog('askStream:complete', {
+            thread_id: params.thread_id,
+            eventCount,
+          });
           resolve();
           return;
         }
 
         if (data.type === 'error') {
           clearTimeout(timeoutId);
+          clearFirstEventTimeout();
           eventSource.close();
           reject(new AgentServiceError(data.message, undefined, data.code));
         }
@@ -255,7 +327,14 @@ class AgentServiceClient {
 
       eventSource.onerror = (error) => {
         clearTimeout(timeoutId);
+        clearFirstEventTimeout();
         eventSource.close();
+        this.debugLog('askStream:error', {
+          thread_id: params.thread_id,
+          eventCount,
+          firstEventReceived,
+          error,
+        });
         reject(
           new AgentServiceError(
             'Stream connection failed',

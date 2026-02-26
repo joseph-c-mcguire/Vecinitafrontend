@@ -43,6 +43,16 @@ interface PendingClarificationState {
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
   const serviceClient = options.service || agentService;
+  const chatDebugEnabled =
+    ((import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true')
+    || (typeof window !== 'undefined' && window.localStorage.getItem('vecinita_debug_chat') === '1');
+
+  const debugLog = (...args: unknown[]) => {
+    if (!chatDebugEnabled) {
+      return;
+    }
+    console.info('[useAgentChat]', ...args);
+  };
   const [threadId, setThreadId] = useState<string>(
     options.initialThreadId || uuidv4()
   );
@@ -156,20 +166,29 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         storage.saveMessages(workingMessages);
       };
 
+      const activeClarification = pendingClarification;
+      const requestParams: AskQueryParams = {
+        question: activeClarification?.originalQuestion || question,
+        thread_id: threadId,
+        lang: options.language,
+        provider: options.provider,
+        model: options.model,
+        clarification_response: activeClarification ? question : undefined,
+      };
+
       try {
-        const activeClarification = pendingClarification;
-        const requestParams: AskQueryParams = {
-          question: activeClarification?.originalQuestion || question,
-          thread_id: threadId,
-          lang: options.language,
-          provider: options.provider,
-          model: options.model,
-          clarification_response: activeClarification ? question : undefined,
-        };
+        debugLog('sendMessage:start', {
+          question,
+          threadId,
+          hasPendingClarification: Boolean(activeClarification),
+        });
         let assistantContent = '';
         let assistantSources: AgentSource[] = [];
         let newThreadId = threadId;
         const latestToolResults = new Map<string, string>();
+        let streamEventCount = 0;
+        let sawCompleteEvent = false;
+        let sawClarificationEvent = false;
 
         const updateProgressFromEvent = (event: {
           stage?: string;
@@ -202,6 +221,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         await serviceClient.askStream(
           requestParams,
           (event: StreamEvent) => {
+            streamEventCount += 1;
+            debugLog('stream:event', { type: event.type, count: streamEventCount });
             switch (event.type) {
               case 'thinking':
                 setStreamingMessage(event.message);
@@ -228,6 +249,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 break;
 
               case 'complete':
+                sawCompleteEvent = true;
                 assistantContent = event.answer;
                 assistantSources = event.sources || assistantSources;
                 setPendingClarification(null);
@@ -248,6 +270,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               case 'clarification':
                 // Handle clarification requests
                 {
+                  sawClarificationEvent = true;
                   const clarificationMessage = event.message
                     || (event.questions && event.questions.length > 0
                       ? event.questions.join(' ')
@@ -307,6 +330,37 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }
         );
 
+        if (!assistantContent.trim() && !sawClarificationEvent) {
+          console.warn('[useAgentChat] Stream finished without assistant content, attempting non-stream fallback', {
+            question,
+            threadId,
+            streamEventCount,
+            sawCompleteEvent,
+          });
+
+          const fallbackResponse = await serviceClient.ask(requestParams);
+          assistantContent = fallbackResponse.answer || '';
+          assistantSources = fallbackResponse.sources || assistantSources;
+          if (fallbackResponse.thread_id) {
+            newThreadId = fallbackResponse.thread_id;
+          }
+
+          debugLog('fallback:non_stream_after_empty_stream', {
+            question,
+            threadId,
+            fallbackHasAnswer: Boolean(assistantContent.trim()),
+          });
+        }
+
+        if (!assistantContent.trim() && !sawClarificationEvent) {
+          assistantContent = 'I could not generate a response right now. Please try again.';
+          debugLog('empty_response:using_default_assistant_message', {
+            question,
+            threadId,
+            streamEventCount,
+          });
+        }
+
         if (latestToolResults.size > 0) {
           const toolSummary = Array.from(latestToolResults.entries())
             .map(([toolName, summary]) => `• ${formatToolLabel(toolName)}\n  ${summary}`)
@@ -337,7 +391,17 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
         // Save to localStorage (will use updated threadId due to useEffect)
         storage.saveMessages(finalMessages);
+        debugLog('sendMessage:success', {
+          question,
+          threadId,
+          finalMessageCount: finalMessages.length,
+        });
       } catch (err) {
+        debugLog('sendMessage:stream_or_processing_error', {
+          question,
+          threadId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
         let agentError =
           err instanceof AgentServiceError
             ? err
@@ -347,12 +411,22 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           const fallbackResponse = await serviceClient.ask(requestParams);
           let fallbackMessages = workingMessages;
 
-          if (fallbackResponse.answer.trim()) {
+          const fallbackAnswer = (fallbackResponse.answer || '').trim();
+          if (fallbackAnswer) {
             const fallbackAssistantMessage: Message = {
               id: uuidv4(),
               role: 'assistant',
-              content: fallbackResponse.answer,
+              content: fallbackAnswer,
               sources: mapSources(fallbackResponse.sources || []),
+              timestamp: new Date(),
+            };
+            fallbackMessages = [...fallbackMessages, fallbackAssistantMessage];
+            setMessages(fallbackMessages);
+          } else {
+            const fallbackAssistantMessage: Message = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: 'I could not generate a response right now. Please try again.',
               timestamp: new Date(),
             };
             fallbackMessages = [...fallbackMessages, fallbackAssistantMessage];
@@ -365,8 +439,18 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
           setError(null);
           storage.saveMessages(fallbackMessages);
+          debugLog('sendMessage:fallback_success', {
+            question,
+            threadId,
+            fallbackMessageCount: fallbackMessages.length,
+          });
           return;
         } catch (fallbackError) {
+          debugLog('sendMessage:fallback_failed', {
+            question,
+            threadId,
+            error: fallbackError instanceof Error ? fallbackError.message : 'unknown',
+          });
           agentError =
             fallbackError instanceof AgentServiceError
               ? fallbackError

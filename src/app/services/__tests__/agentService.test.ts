@@ -397,6 +397,37 @@ describe('AgentServiceClient', () => {
 
       expect(savedEventSource.closed).toBe(true);
     });
+
+    it('should reject when stream stalls before first event', async () => {
+      vi.useFakeTimers();
+      let savedEventSource: any = null;
+
+      (globalThis.EventSource as any) = class MockES {
+        onmessage: ((event: MessageEvent) => void) | null = null;
+        onerror: ((event: Event) => void) | null = null;
+        url: string;
+
+        constructor(url: string) {
+          this.url = url;
+          savedEventSource = this;
+        }
+
+        close() {}
+      };
+
+      try {
+        const streamPromise = client.askStream({ question: 'test' }, () => {});
+        const capturedErrorPromise = streamPromise.catch((error) => error);
+
+        await vi.advanceTimersByTimeAsync(16000);
+
+        const error = await capturedErrorPromise;
+        expect(error).toMatchObject({ code: 'STREAM_STALLED' });
+        expect(savedEventSource).toBeTruthy();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   describe('getConfig', () => {
