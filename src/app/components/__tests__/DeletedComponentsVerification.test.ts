@@ -7,7 +7,7 @@ import path from 'path';
  * This is a file-system based test that scans the codebase for mentions of deleted components
  */
 describe('Deleted Components - Codebase Verification', () => {
-  const componentDir = '/root/GitHub/VECINA/vecinita/frontend/src/app';
+  const componentDir = path.resolve(__dirname, '..', '..');
   
   const deletedComponents = [
     'AccessibleButton',
