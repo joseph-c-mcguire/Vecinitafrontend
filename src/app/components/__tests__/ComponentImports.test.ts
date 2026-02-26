@@ -97,7 +97,6 @@ describe('Deleted Components - Should Not Exist', () => {
     'AccessibleButton',
     'AddDocumentModal',
     'AdminAuthModal',
-    'AdminDashboard',
     'AdminLogin',
     'AuthModal',
     'BackendSettingsPanel',

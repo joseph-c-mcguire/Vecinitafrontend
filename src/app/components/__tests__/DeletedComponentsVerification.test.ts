@@ -13,7 +13,6 @@ describe('Deleted Components - Codebase Verification', () => {
     'AccessibleButton',
     'AddDocumentModal',
     'AdminAuthModal',
-    'AdminDashboard',
     'AdminLogin',
     'AuthModal',
     'BackendSettingsPanel',
