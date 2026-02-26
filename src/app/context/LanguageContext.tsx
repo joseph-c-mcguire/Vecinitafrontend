@@ -322,6 +322,234 @@ const translations: Translations = {
     en: 'Failed to download resource',
     es: 'Error al descargar el recurso',
   },
+  adminTagsPlaceholder: {
+    en: 'Tags (comma separated, optional)',
+    es: 'Etiquetas (separadas por comas, opcional)',
+  },
+  adminTagsAutocompleteHint: {
+    en: 'Autocomplete from existing tags. You can add custom tags.',
+    es: 'Autocompletado con etiquetas existentes. Puedes agregar etiquetas personalizadas.',
+  },
+  adminEditTagsTitle: {
+    en: 'Edit tags',
+    es: 'Editar etiquetas',
+  },
+  adminSave: {
+    en: 'Save',
+    es: 'Guardar',
+  },
+  adminTitle: {
+    en: 'Admin',
+    es: 'Administración',
+  },
+  adminSubtitle: {
+    en: 'Manage corpus sources, upload documents, and monitor the scraper queue.',
+    es: 'Administra fuentes del corpus, sube documentos y supervisa la cola del scraper.',
+  },
+  adminTabSources: {
+    en: 'Sources',
+    es: 'Fuentes',
+  },
+  adminTabUpload: {
+    en: 'Upload',
+    es: 'Subir',
+  },
+  adminTabQueue: {
+    en: 'Queue',
+    es: 'Cola',
+  },
+  adminTabModels: {
+    en: 'Models',
+    es: 'Modelos',
+  },
+  adminCheckingPermissions: {
+    en: 'Checking permissions…',
+    es: 'Verificando permisos…',
+  },
+  adminAddNewSource: {
+    en: 'Add New Source',
+    es: 'Agregar nueva fuente',
+  },
+  adminCrawlDepth: {
+    en: 'Crawl depth',
+    es: 'Profundidad de rastreo',
+  },
+  adminDepth: {
+    en: 'Depth',
+    es: 'Profundidad',
+  },
+  adminAdd: {
+    en: 'Add',
+    es: 'Agregar',
+  },
+  adminRefresh: {
+    en: 'Refresh',
+    es: 'Actualizar',
+  },
+  adminSource: {
+    en: 'Source',
+    es: 'Fuente',
+  },
+  adminTags: {
+    en: 'Tags',
+    es: 'Etiquetas',
+  },
+  adminChunks: {
+    en: 'Chunks',
+    es: 'Fragmentos',
+  },
+  adminLoading: {
+    en: 'Loading…',
+    es: 'Cargando…',
+  },
+  adminNoSourcesYet: {
+    en: 'No sources yet.',
+    es: 'Aún no hay fuentes.',
+  },
+  adminDeleteChunks: {
+    en: 'Delete chunks',
+    es: 'Eliminar fragmentos',
+  },
+  adminDeleteChunksConfirm: {
+    en: 'Delete all chunks for:',
+    es: 'Eliminar todos los fragmentos de:',
+  },
+  adminSourcesCount: {
+    en: 'sources',
+    es: 'fuentes',
+  },
+  adminAddedSourceIndexed: {
+    en: 'Added source and indexed {count} chunks.',
+    es: 'Se agregó la fuente y se indexaron {count} fragmentos.',
+  },
+  adminQueuedSource: {
+    en: 'Queued: {url}',
+    es: 'En cola: {url}',
+  },
+  adminDeletedChunks: {
+    en: 'Deleted {count} chunks.',
+    es: 'Se eliminaron {count} fragmentos.',
+  },
+  adminDropFile: {
+    en: 'Drop a file here or click to select',
+    es: 'Suelta un archivo aquí o haz clic para seleccionarlo',
+  },
+  adminUploadMaxInfo: {
+    en: 'PDF, TXT, HTML, Markdown — max 50 MB',
+    es: 'PDF, TXT, HTML, Markdown — máximo 50 MB',
+  },
+  adminUnknownType: {
+    en: 'unknown type',
+    es: 'tipo desconocido',
+  },
+  adminUploading: {
+    en: 'Uploading…',
+    es: 'Subiendo…',
+  },
+  adminUploadAndEmbed: {
+    en: 'Upload & Embed',
+    es: 'Subir e indexar',
+  },
+  adminUploadedChunksInserted: {
+    en: 'Uploaded: {count} chunks inserted.',
+    es: 'Subido: {count} fragmentos insertados.',
+  },
+  adminUploadHelp: {
+    en: 'Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into Chroma automatically. Use the Queue tab to monitor progress for URL-based sources.',
+    es: 'Los archivos subidos se dividen en fragmentos (1000 caracteres / 200 de superposición), se vectorizan y se insertan en Chroma automáticamente. Usa la pestaña Cola para supervisar el progreso de las fuentes por URL.',
+  },
+  adminAllStatuses: {
+    en: 'All statuses',
+    es: 'Todos los estados',
+  },
+  adminPending: {
+    en: 'Pending',
+    es: 'Pendiente',
+  },
+  adminProcessing: {
+    en: 'Processing',
+    es: 'Procesando',
+  },
+  adminRunning: {
+    en: 'Running',
+    es: 'En ejecución',
+  },
+  adminCompleted: {
+    en: 'Completed',
+    es: 'Completado',
+  },
+  adminFailed: {
+    en: 'Failed',
+    es: 'Fallido',
+  },
+  adminAutoRefresh: {
+    en: 'Auto-refresh 10 s',
+    es: 'Autoactualizar cada 10 s',
+  },
+  adminType: {
+    en: 'Type',
+    es: 'Tipo',
+  },
+  adminStatus: {
+    en: 'Status',
+    es: 'Estado',
+  },
+  adminProgress: {
+    en: 'Progress',
+    es: 'Progreso',
+  },
+  adminCreated: {
+    en: 'Created',
+    es: 'Creado',
+  },
+  adminNoJobs: {
+    en: 'No jobs.',
+    es: 'No hay trabajos.',
+  },
+  adminFileType: {
+    en: 'file',
+    es: 'archivo',
+  },
+  adminFailedJobs: {
+    en: 'Failed jobs:',
+    es: 'Trabajos fallidos:',
+  },
+  adminChunksLabel: {
+    en: 'Chunks:',
+    es: 'Fragmentos:',
+  },
+  adminModelConfigUpdated: {
+    en: 'Model configuration updated.',
+    es: 'La configuración del modelo se actualizó.',
+  },
+  adminLoadingModelSettings: {
+    en: 'Loading model settings…',
+    es: 'Cargando configuración de modelos…',
+  },
+  adminModelConfiguration: {
+    en: 'Model Configuration',
+    es: 'Configuración de modelos',
+  },
+  adminGenerationModel: {
+    en: 'Generation Model',
+    es: 'Modelo de generación',
+  },
+  adminEmbeddingModel: {
+    en: 'Embedding Model',
+    es: 'Modelo de embeddings',
+  },
+  adminSelectProvider: {
+    en: 'Select provider',
+    es: 'Seleccionar proveedor',
+  },
+  adminSelectModel: {
+    en: 'Select model',
+    es: 'Seleccionar modelo',
+  },
+  adminSaveModelSettings: {
+    en: 'Save model settings',
+    es: 'Guardar configuración de modelos',
+  },
 };
 
 interface LanguageContextType {

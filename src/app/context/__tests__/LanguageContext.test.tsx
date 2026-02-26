@@ -112,6 +112,9 @@ describe('LanguageContext', () => {
       expect(result.current.t('appTitle')).toBe('Vecinita');
       expect(result.current.t('sendMessage')).toBe('Send message');
       expect(result.current.t('typePlaceholder')).toBe('Type your question...');
+      expect(result.current.t('adminTagsPlaceholder')).toBe('Tags (comma separated, optional)');
+      expect(result.current.t('adminTitle')).toBe('Admin');
+      expect(result.current.t('adminTabQueue')).toBe('Queue');
     });
 
     it('should translate keys correctly in Spanish', () => {
@@ -122,6 +125,9 @@ describe('LanguageContext', () => {
       expect(result.current.t('appTitle')).toBe('Vecinita');
       expect(result.current.t('sendMessage')).toBe('Enviar mensaje');
       expect(result.current.t('typePlaceholder')).toBe('Escribe tu pregunta...');
+      expect(result.current.t('adminTagsPlaceholder')).toBe('Etiquetas (separadas por comas, opcional)');
+      expect(result.current.t('adminTitle')).toBe('Administración');
+      expect(result.current.t('adminTabQueue')).toBe('Cola');
     });
 
     it('should return key when translation not found', () => {

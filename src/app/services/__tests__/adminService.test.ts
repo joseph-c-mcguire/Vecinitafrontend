@@ -133,10 +133,12 @@ describe('adminService', () => {
       })
     );
 
-    const result = await updateSourceTags('https://example.com', ['housing']);
+    const result = await updateSourceTags('https://example.com', ['housing'], 'es');
     expect(result.status).toBe('updated');
 
     const call = vi.mocked(fetch).mock.calls[0];
+    expect(call[0]).toContain('/admin/sources/tags?');
+    expect(call[0]).toContain('lang=es');
     expect(call[1]?.method).toBe('PATCH');
     expect(call[1]?.body).toBe(JSON.stringify({ url: 'https://example.com', tags: ['housing'] }));
   });
@@ -149,12 +151,13 @@ describe('adminService', () => {
       })
     );
 
-    const result = await getMetadataTags('ho', 10);
+    const result = await getMetadataTags('ho', 10, 'es');
     expect(result.tags).toEqual(['food', 'housing']);
 
     const callUrl = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(callUrl).toContain('/admin/tags?');
     expect(callUrl).toContain('query=ho');
     expect(callUrl).toContain('limit=10');
+    expect(callUrl).toContain('lang=es');
   });
 });

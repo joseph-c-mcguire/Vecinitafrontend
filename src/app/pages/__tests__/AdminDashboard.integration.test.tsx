@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AdminDashboard from '../AdminDashboard';
+import { LanguageProvider } from '../../context/LanguageContext';
 
 const mockNavigate = vi.fn();
 const mockAddSource = vi.fn();
@@ -13,6 +14,8 @@ const mockUploadDocument = vi.fn();
 const mockGetSources = vi.fn();
 const mockGetMetadataTags = vi.fn();
 const mockUpdateSourceTags = vi.fn();
+const mockGetModelConfig = vi.fn();
+const mockUpdateModelConfig = vi.fn();
 
 vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({
@@ -37,11 +40,14 @@ vi.mock('../../services/adminService', () => ({
   getSources: (...args: unknown[]) => mockGetSources(...args),
   getMetadataTags: (...args: unknown[]) => mockGetMetadataTags(...args),
   updateSourceTags: (...args: unknown[]) => mockUpdateSourceTags(...args),
+  getModelConfig: (...args: unknown[]) => mockGetModelConfig(...args),
+  updateModelConfig: (...args: unknown[]) => mockUpdateModelConfig(...args),
 }));
 
 describe('AdminDashboard integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.setItem('vecinita-language', 'en');
     mockGetQueue.mockResolvedValue({ jobs: [], total: 0 });
     mockGetMetadataTags.mockResolvedValue({ tags: ['housing', 'food'], total: 2 });
     mockGetSources.mockResolvedValue({
@@ -57,15 +63,33 @@ describe('AdminDashboard integration', () => {
     });
     mockAddSource.mockResolvedValue({ status: 'completed', url: 'https://example.com', depth: 1, tags: ['housing'], chunks_inserted: 3, chunks_total: 3 });
     mockUpdateSourceTags.mockResolvedValue({ status: 'updated', url: 'https://example.com', tags: ['housing', 'food'], chunks_updated: 2 });
+    mockGetModelConfig.mockResolvedValue({
+      generation: {
+        current: { provider: 'groq', model: 'llama-3.1' },
+        available: {
+          providers: [{ key: 'groq', label: 'Groq' }],
+          models: { groq: ['llama-3.1'] },
+        },
+      },
+      embeddings: {
+        current: { provider: 'modal', model: 'bge-small' },
+        available: {
+          providers: [{ key: 'modal', label: 'Modal' }],
+          models: { modal: ['bge-small'] },
+        },
+      },
+    });
   });
 
   it('adds a source with normalized metadata tags', async () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AdminDashboard />
-      </MemoryRouter>
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
     );
 
     await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
@@ -83,9 +107,11 @@ describe('AdminDashboard integration', () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AdminDashboard />
-      </MemoryRouter>
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
     );
 
     await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
@@ -100,7 +126,7 @@ describe('AdminDashboard integration', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(mockUpdateSourceTags).toHaveBeenCalledWith('https://example.com', ['housing', 'food']);
+      expect(mockUpdateSourceTags).toHaveBeenCalledWith('https://example.com', ['housing', 'food'], 'en');
     });
   });
 
@@ -115,9 +141,11 @@ describe('AdminDashboard integration', () => {
     });
 
     const { container } = render(
-      <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AdminDashboard />
-      </MemoryRouter>
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
     );
 
     await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
@@ -136,5 +164,54 @@ describe('AdminDashboard integration', () => {
     });
 
     expect(screen.getByText(/Uploaded: 2 chunks inserted\./i)).toBeInTheDocument();
+  });
+
+  it('shows tagging UI text in Spanish', async () => {
+    localStorage.setItem('vecinita-language', 'es');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
+
+    expect(screen.getByRole('heading', { name: 'Administración' })).toBeInTheDocument();
+    expect(screen.getByText('Fuentes')).toBeInTheDocument();
+    expect(screen.getByText('Subir')).toBeInTheDocument();
+    expect(screen.getByText('Cola')).toBeInTheDocument();
+    expect(screen.getByText('Modelos')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Etiquetas (separadas por comas, opcional)')).toBeInTheDocument();
+    expect(screen.getByText('Autocompletado con etiquetas existentes. Puedes agregar etiquetas personalizadas.')).toBeInTheDocument();
+  });
+
+  it('switches to Queue and Models tabs in Spanish with localized labels', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem('vecinita-language', 'es');
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
+
+    await user.click(screen.getByRole('button', { name: 'Cola' }));
+    expect(screen.getByText('Todos los estados')).toBeInTheDocument();
+    expect(screen.getByText('Autoactualizar cada 10 s')).toBeInTheDocument();
+    expect(screen.getByText('No hay trabajos.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Modelos' }));
+    await waitFor(() => expect(mockGetModelConfig).toHaveBeenCalled());
+    expect(screen.getByText('Configuración de modelos')).toBeInTheDocument();
+    expect(screen.getByText('Modelo de generación')).toBeInTheDocument();
+    expect(screen.getByText('Modelo de embeddings')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Guardar configuración de modelos' })).toBeInTheDocument();
   });
 });

@@ -245,9 +245,14 @@ export async function getSources(page = 1, limit = 50): Promise<{ sources: Admin
   return { sources, total: payload.total ?? sources.length };
 }
 
-export async function updateSourceTags(url: string, tags: string[]): Promise<{ status: string; chunks_updated: number; tags: string[] }> {
+export async function updateSourceTags(
+  url: string,
+  tags: string[],
+  lang: 'en' | 'es' = 'en'
+): Promise<{ status: string; chunks_updated: number; tags: string[]; message?: string }> {
   const headers = await _authHeaders();
-  const res = await fetch(`${API_BASE}/admin/sources/tags`, {
+  const params = new URLSearchParams({ lang });
+  const res = await fetch(`${API_BASE}/admin/sources/tags?${params.toString()}`, {
     method: 'PATCH',
     headers: {
       ...headers,
@@ -258,11 +263,12 @@ export async function updateSourceTags(url: string, tags: string[]): Promise<{ s
   return _handleResponse(res);
 }
 
-export async function getMetadataTags(query = '', limit = 100): Promise<{ tags: string[]; total: number }> {
+export async function getMetadataTags(query = '', limit = 100, lang: 'en' | 'es' = 'en'): Promise<{ tags: string[]; total: number }> {
   const headers = await _authHeaders();
   const params = new URLSearchParams();
   if (query) params.set('query', query);
   params.set('limit', String(limit));
+  params.set('lang', lang);
   const res = await fetch(`${API_BASE}/admin/tags?${params.toString()}`, { headers });
   return _handleResponse(res);
 }

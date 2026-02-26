@@ -28,6 +28,7 @@ import {
   Cpu,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import {
   addSource,
   deleteSource,
@@ -42,6 +43,13 @@ import {
   type QueueJob,
   type QueueStatusSummaryItem,
 } from '../services/adminService';
+
+function formatTranslation(template: string, vars: Record<string, string | number>) {
+  return Object.entries(vars).reduce(
+    (accumulator, [key, value]) => accumulator.replace(`{${key}}`, String(value)),
+    template,
+  );
+}
 
 // ── helpers ---------------------------------------------------------------
 
@@ -69,6 +77,7 @@ function TabButton({
 }
 
 function StatusBadge({ status }: { status: QueueJob['status'] }) {
+  const { t } = useLanguage();
   const map: Record<QueueJob['status'], { icon: React.ReactNode; cls: string }> = {
     pending: { icon: <Clock size={12} />, cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
     running: { icon: <Loader2 size={12} className="animate-spin" />, cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
@@ -78,10 +87,18 @@ function StatusBadge({ status }: { status: QueueJob['status'] }) {
     failed: { icon: <XCircle size={12} />, cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
   };
   const { icon, cls } = map[status] ?? map.pending;
+  const statusLabelMap: Partial<Record<QueueJob['status'], string>> = {
+    pending: t('adminPending'),
+    processing: t('adminProcessing'),
+    running: t('adminRunning'),
+    done: t('adminCompleted'),
+    completed: t('adminCompleted'),
+    failed: t('adminFailed'),
+  };
   return (
     <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
       {icon}
-      {status}
+      {statusLabelMap[status] ?? status}
     </span>
   );
 }
@@ -114,6 +131,7 @@ function tagsToText(tags?: string[]) {
 }
 
 function SourcesTab() {
+  const { t, language } = useLanguage();
   const [sources, setSources] = useState<SourceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [url, setUrl] = useState('');
@@ -144,7 +162,7 @@ function SourcesTab() {
     let cancelled = false;
     const loadTags = async () => {
       try {
-        const result = await getMetadataTags('', 100);
+        const result = await getMetadataTags('', 100, language);
         if (!cancelled) setTagSuggestions(result.tags ?? []);
       } catch {
         if (!cancelled) setTagSuggestions([]);
@@ -154,7 +172,7 @@ function SourcesTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [language]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,11 +184,11 @@ function SourcesTab() {
       const result = await addSource(url.trim(), depth, normalizedTags);
       if (result.status === 'completed') {
         setMessage({
-          text: `Added source and indexed ${result.chunks_inserted ?? 0} chunks.`,
+          text: formatTranslation(t('adminAddedSourceIndexed'), { count: result.chunks_inserted ?? 0 }),
           ok: true,
         });
       } else {
-        setMessage({ text: `Queued: ${url}`, ok: true });
+        setMessage({ text: formatTranslation(t('adminQueuedSource'), { url }), ok: true });
       }
       setUrl('');
       setTagsText('');
@@ -191,8 +209,14 @@ function SourcesTab() {
     setMessage(null);
     try {
       const normalizedTags = normalizeTagsFromInput(editingTagsText);
-      const result = await updateSourceTags(sourceUrl, normalizedTags);
-      setMessage({ text: `Updated ${result.chunks_updated} chunks with tags.`, ok: true });
+      const result = await updateSourceTags(sourceUrl, normalizedTags, language);
+      setMessage({
+        text:
+          language === 'es'
+            ? `Se actualizaron ${result.chunks_updated} fragmentos con etiquetas.`
+            : `Updated ${result.chunks_updated} chunks with tags.`,
+        ok: true,
+      });
       setEditingUrl(null);
       setEditingTagsText('');
       await load();
@@ -202,12 +226,12 @@ function SourcesTab() {
   };
 
   const handleDelete = async (sourceUrl: string) => {
-    if (!confirm(`Delete all chunks for:\n${sourceUrl}`)) return;
+    if (!confirm(`${t('adminDeleteChunksConfirm')}\n${sourceUrl}`)) return;
     setDeletingUrl(sourceUrl);
     setMessage(null);
     try {
       const res = await deleteSource(sourceUrl);
-      setMessage({ text: `Deleted ${res.chunks_deleted} chunks.`, ok: true });
+      setMessage({ text: formatTranslation(t('adminDeletedChunks'), { count: res.chunks_deleted }), ok: true });
       await load();
     } catch (e) {
       setMessage({ text: String(e), ok: false });
@@ -220,7 +244,7 @@ function SourcesTab() {
     <div className="space-y-6">
       {/* Add source form */}
       <form onSubmit={handleAdd} className="rounded-xl border bg-card p-4 space-y-3">
-        <h3 className="font-medium text-sm">Add New Source</h3>
+        <h3 className="font-medium text-sm">{t('adminAddNewSource')}</h3>
         <div className="flex gap-2">
           <input
             type="url"
@@ -234,10 +258,10 @@ function SourcesTab() {
             value={depth}
             onChange={(e) => setDepth(Number(e.target.value))}
             className="rounded-md border bg-background px-2 py-2 text-sm focus:outline-none"
-            title="Crawl depth"
+            title={t('adminCrawlDepth')}
           >
             {[0, 1, 2, 3].map((d) => (
-              <option key={d} value={d}>Depth {d}</option>
+              <option key={d} value={d}>{t('adminDepth')} {d}</option>
             ))}
           </select>
           <button
@@ -246,7 +270,7 @@ function SourcesTab() {
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {adding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-            Add
+            {t('adminAdd')}
           </button>
         </div>
         <div className="space-y-1">
@@ -255,10 +279,10 @@ function SourcesTab() {
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             list="admin-tag-suggestions"
-            placeholder="Tags (comma separated, optional)"
+            placeholder={t('adminTagsPlaceholder')}
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
-          <p className="text-xs text-muted-foreground">Autocomplete from existing tags. You can add custom tags.</p>
+          <p className="text-xs text-muted-foreground">{t('adminTagsAutocompleteHint')}</p>
         </div>
         <datalist id="admin-tag-suggestions">
           {tagSuggestions.map((tag) => (
@@ -281,26 +305,26 @@ function SourcesTab() {
       {/* Source list */}
       <div className="rounded-xl border overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">
-          <span className="text-sm font-medium">{sources.length} sources</span>
-          <button onClick={load} className="p-1 rounded hover:bg-accent transition-colors" title="Refresh">
+          <span className="text-sm font-medium">{sources.length} {t('adminSourcesCount')}</span>
+          <button onClick={load} className="p-1 rounded hover:bg-accent transition-colors" title={t('adminRefresh')}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wide text-muted-foreground bg-muted/20">
             <tr>
-              <th className="px-4 py-2 text-left">Source</th>
-              <th className="px-4 py-2 text-left">Tags</th>
-              <th className="px-4 py-2 text-right">Chunks</th>
+              <th className="px-4 py-2 text-left">{t('adminSource')}</th>
+              <th className="px-4 py-2 text-left">{t('adminTags')}</th>
+              <th className="px-4 py-2 text-right">{t('adminChunks')}</th>
               <th className="px-4 py-2 w-20" />
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading && (
-              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">{t('adminLoading')}</td></tr>
             )}
             {!loading && sources.length === 0 && (
-              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No sources yet.</td></tr>
+              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">{t('adminNoSourcesYet')}</td></tr>
             )}
             {sources.map((s) => (
               <tr key={s.url} className="hover:bg-muted/20 transition-colors">
@@ -325,7 +349,7 @@ function SourcesTab() {
                         onClick={() => handleSaveTags(s.url)}
                         className="rounded border px-2 py-1 text-xs hover:bg-accent"
                       >
-                        Save
+                        {t('adminSave')}
                       </button>
                     </div>
                   ) : (
@@ -340,7 +364,7 @@ function SourcesTab() {
                     <button
                       onClick={() => startEditTags(s)}
                       className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-                      title="Edit tags"
+                      title={t('adminEditTagsTitle')}
                     >
                       <Pencil size={14} />
                     </button>
@@ -348,7 +372,7 @@ function SourcesTab() {
                       onClick={() => handleDelete(s.url)}
                       disabled={deletingUrl === s.url}
                       className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                      title="Delete chunks"
+                      title={t('adminDeleteChunks')}
                     >
                       {deletingUrl === s.url
                         ? <Loader2 size={14} className="animate-spin" />
@@ -369,6 +393,7 @@ function SourcesTab() {
 // ── Upload tab ------------------------------------------------------------
 
 function UploadTab() {
+  const { t, language } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [result, setResult] = useState<{ text: string; ok: boolean } | null>(null);
@@ -381,7 +406,7 @@ function UploadTab() {
     let cancelled = false;
     const loadTags = async () => {
       try {
-        const result = await getMetadataTags('', 100);
+        const result = await getMetadataTags('', 100, language);
         if (!cancelled) setTagSuggestions(result.tags ?? []);
       } catch {
         if (!cancelled) setTagSuggestions([]);
@@ -391,7 +416,7 @@ function UploadTab() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [language]);
 
   const handleFile = (f: File | null) => {
     setFile(f);
@@ -412,7 +437,7 @@ function UploadTab() {
     try {
       const normalizedTags = normalizeTagsFromInput(tagsText);
       const res = await uploadDocument(file, normalizedTags);
-      setResult({ text: `Uploaded: ${res.chunks_inserted ?? '?'} chunks inserted.`, ok: true });
+      setResult({ text: formatTranslation(t('adminUploadedChunksInserted'), { count: res.chunks_inserted ?? '?' }), ok: true });
       setFile(null);
       setTagsText('');
     } catch (e) {
@@ -436,9 +461,9 @@ function UploadTab() {
       >
         <Upload size={32} className="mx-auto mb-3 text-muted-foreground" />
         <p className="text-sm font-medium">
-          {file ? file.name : 'Drop a file here or click to select'}
+          {file ? file.name : t('adminDropFile')}
         </p>
-        <p className="text-xs text-muted-foreground mt-1">PDF, TXT, HTML, Markdown — max 50 MB</p>
+        <p className="text-xs text-muted-foreground mt-1">{t('adminUploadMaxInfo')}</p>
         <input
           ref={inputRef}
           type="file"
@@ -452,14 +477,14 @@ function UploadTab() {
         <div className="rounded-lg border bg-card px-4 py-3 space-y-3">
           <div className="text-sm">
             <p className="font-medium">{file.name}</p>
-            <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · {file.type || 'unknown type'}</p>
+            <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · {file.type || t('adminUnknownType')}</p>
           </div>
           <input
             type="text"
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             list="upload-tag-suggestions"
-            placeholder="Tags (comma separated, optional)"
+            placeholder={t('adminTagsPlaceholder')}
             className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           <datalist id="upload-tag-suggestions">
@@ -474,7 +499,7 @@ function UploadTab() {
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
             >
               {uploading ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-              {uploading ? 'Uploading…' : 'Upload & Embed'}
+              {uploading ? t('adminUploading') : t('adminUploadAndEmbed')}
             </button>
           </div>
         </div>
@@ -490,8 +515,7 @@ function UploadTab() {
       )}
 
       <p className="text-xs text-muted-foreground">
-        Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into Chroma automatically.
-        Use the Queue tab to monitor progress for URL-based sources.
+        {t('adminUploadHelp')}
       </p>
     </div>
   );
@@ -500,6 +524,7 @@ function UploadTab() {
 // ── Queue tab -------------------------------------------------------------
 
 function QueueTab() {
+  const { t } = useLanguage();
   const [jobs, setJobs] = useState<QueueJob[]>([]);
   const [summary, setSummary] = useState<QueueStatusSummaryItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -541,12 +566,12 @@ function QueueTab() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-md border bg-background px-2 py-1.5 text-sm focus:outline-none"
           >
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="running">Running</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
+            <option value="">{t('adminAllStatuses')}</option>
+            <option value="pending">{t('adminPending')}</option>
+            <option value="processing">{t('adminProcessing')}</option>
+            <option value="running">{t('adminRunning')}</option>
+            <option value="completed">{t('adminCompleted')}</option>
+            <option value="failed">{t('adminFailed')}</option>
           </select>
         </div>
         <div className="flex items-center gap-3">
@@ -557,9 +582,9 @@ function QueueTab() {
               onChange={(e) => setAutoRefresh(e.target.checked)}
               className="rounded"
             />
-            Auto-refresh 10 s
+            {t('adminAutoRefresh')}
           </label>
-          <button onClick={() => { setLoading(true); load(); }} className="p-1 rounded hover:bg-accent transition-colors" title="Refresh">
+          <button onClick={() => { setLoading(true); load(); }} className="p-1 rounded hover:bg-accent transition-colors" title={t('adminRefresh')}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -572,7 +597,7 @@ function QueueTab() {
               <p className="text-muted-foreground uppercase tracking-wide">{item.status}</p>
               <p className="text-base font-semibold">{item.job_count}</p>
               <p className="text-muted-foreground">
-                Chunks: {item.total_chunks_processed ?? 0}
+                {t('adminChunksLabel')} {item.total_chunks_processed ?? 0}
               </p>
             </div>
           ))}
@@ -584,24 +609,24 @@ function QueueTab() {
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wide text-muted-foreground bg-muted/40">
             <tr>
-              <th className="px-4 py-2 text-left">Source</th>
-              <th className="px-4 py-2 text-center">Type</th>
-              <th className="px-4 py-2 text-center">Status</th>
-              <th className="px-4 py-2 text-center">Progress</th>
-              <th className="px-4 py-2 text-left">Created</th>
+              <th className="px-4 py-2 text-left">{t('adminSource')}</th>
+              <th className="px-4 py-2 text-center">{t('adminType')}</th>
+              <th className="px-4 py-2 text-center">{t('adminStatus')}</th>
+              <th className="px-4 py-2 text-center">{t('adminProgress')}</th>
+              <th className="px-4 py-2 text-left">{t('adminCreated')}</th>
             </tr>
           </thead>
           <tbody className="divide-y">
             {loading && (
-              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">Loading…</td></tr>
+              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">{t('adminLoading')}</td></tr>
             )}
             {!loading && jobs.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No jobs.</td></tr>
+              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">{t('adminNoJobs')}</td></tr>
             )}
             {jobs.map((job) => (
               <tr key={job.id} className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">{job.url || job.file_path || '—'}</td>
-                <td className="px-4 py-3 text-center uppercase text-xs text-muted-foreground">{job.job_type || 'file'}</td>
+                <td className="px-4 py-3 text-center uppercase text-xs text-muted-foreground">{job.job_type || t('adminFileType')}</td>
                 <td className="px-4 py-3 text-center"><StatusBadge status={job.status} /></td>
                 <td className="px-4 py-3 text-center text-xs text-muted-foreground">
                   {job.total_chunks ? `${job.chunks_processed ?? 0}/${job.total_chunks}` : `${job.chunks_processed ?? 0}`}
@@ -619,7 +644,7 @@ function QueueTab() {
         <div className="rounded-lg bg-red-50 dark:bg-red-900/20 px-4 py-3 text-xs text-red-700 dark:text-red-300 flex items-start gap-2">
           <AlertTriangle size={14} className="mt-0.5 shrink-0" />
           <div>
-            Failed jobs:
+            {t('adminFailedJobs')}
             <ul className="mt-1 list-disc list-inside space-y-0.5">
               {jobs.filter((j) => j.status === 'failed').map((j) => (
                 <li key={j.id}><span className="font-mono">{j.url || j.file_path}</span>{j.error ? ` — ${j.error}` : ''}</li>
@@ -633,6 +658,7 @@ function QueueTab() {
 }
 
 function ModelSettingsTab() {
+  const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -689,7 +715,7 @@ function ModelSettingsTab() {
         generation: generationProvider ? { provider: generationProvider, model: generationModel || undefined } : undefined,
         embeddings: embeddingProvider && embeddingModel ? { provider: embeddingProvider, model: embeddingModel } : undefined,
       });
-      setMessage({ text: 'Model configuration updated.', ok: true });
+      setMessage({ text: t('adminModelConfigUpdated'), ok: true });
       await load();
     } catch (error) {
       setMessage({ text: String(error), ok: false });
@@ -699,15 +725,15 @@ function ModelSettingsTab() {
   };
 
   if (loading) {
-    return <p className="text-sm text-muted-foreground">Loading model settings…</p>;
+    return <p className="text-sm text-muted-foreground">{t('adminLoadingModelSettings')}</p>;
   }
 
   return (
     <form onSubmit={onSave} className="space-y-4 rounded-xl border bg-card p-4">
-      <h3 className="text-sm font-medium">Model Configuration</h3>
+      <h3 className="text-sm font-medium">{t('adminModelConfiguration')}</h3>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Generation Model</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('adminGenerationModel')}</p>
           <select
             value={generationProvider}
             onChange={(e) => {
@@ -718,7 +744,7 @@ function ModelSettingsTab() {
             }}
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Select provider</option>
+            <option value="">{t('adminSelectProvider')}</option>
             {generationOptions.providers.map((provider) => (
               <option key={provider.key} value={provider.key}>{provider.label}</option>
             ))}
@@ -729,7 +755,7 @@ function ModelSettingsTab() {
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             disabled={!generationProvider || generationModels.length === 0}
           >
-            <option value="">Select model</option>
+            <option value="">{t('adminSelectModel')}</option>
             {generationModels.map((model) => (
               <option key={model} value={model}>{model}</option>
             ))}
@@ -737,7 +763,7 @@ function ModelSettingsTab() {
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Embedding Model</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('adminEmbeddingModel')}</p>
           <select
             value={embeddingProvider}
             onChange={(e) => {
@@ -748,7 +774,7 @@ function ModelSettingsTab() {
             }}
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
           >
-            <option value="">Select provider</option>
+            <option value="">{t('adminSelectProvider')}</option>
             {embeddingOptions.providers.map((provider) => (
               <option key={provider.key} value={provider.key}>{provider.label}</option>
             ))}
@@ -759,7 +785,7 @@ function ModelSettingsTab() {
             className="w-full rounded-md border bg-background px-3 py-2 text-sm"
             disabled={!embeddingProvider || embeddingModels.length === 0}
           >
-            <option value="">Select model</option>
+            <option value="">{t('adminSelectModel')}</option>
             {embeddingModels.map((model) => (
               <option key={model} value={model}>{model}</option>
             ))}
@@ -779,7 +805,7 @@ function ModelSettingsTab() {
         className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
       >
         {saving ? <Loader2 size={14} className="animate-spin" /> : <Cpu size={14} />}
-        Save model settings
+        {t('adminSaveModelSettings')}
       </button>
     </form>
   );
@@ -791,6 +817,7 @@ type Tab = 'sources' | 'upload' | 'queue' | 'models';
 
 export default function AdminDashboard() {
   const { user, isAdmin } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>('sources');
 
@@ -804,7 +831,7 @@ export default function AdminDashboard() {
   if (!user || !isAdmin) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        <p className="text-muted-foreground animate-pulse">Checking permissions…</p>
+        <p className="text-muted-foreground animate-pulse">{t('adminCheckingPermissions')}</p>
       </main>
     );
   }
@@ -812,23 +839,23 @@ export default function AdminDashboard() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Admin</h1>
-        <p className="text-muted-foreground mt-1">Manage corpus sources, upload documents, and monitor the scraper queue.</p>
+        <h1 className="text-2xl font-bold">{t('adminTitle')}</h1>
+        <p className="text-muted-foreground mt-1">{t('adminSubtitle')}</p>
       </div>
 
       {/* Tabs */}
       <div className="border-b flex gap-1">
         <TabButton active={tab === 'sources'} onClick={() => setTab('sources')}>
-          <span className="flex items-center gap-1.5"><List size={14} />Sources</span>
+          <span className="flex items-center gap-1.5"><List size={14} />{t('adminTabSources')}</span>
         </TabButton>
         <TabButton active={tab === 'upload'} onClick={() => setTab('upload')}>
-          <span className="flex items-center gap-1.5"><Upload size={14} />Upload</span>
+          <span className="flex items-center gap-1.5"><Upload size={14} />{t('adminTabUpload')}</span>
         </TabButton>
         <TabButton active={tab === 'queue'} onClick={() => setTab('queue')}>
-          <span className="flex items-center gap-1.5"><Clock size={14} />Queue</span>
+          <span className="flex items-center gap-1.5"><Clock size={14} />{t('adminTabQueue')}</span>
         </TabButton>
         <TabButton active={tab === 'models'} onClick={() => setTab('models')}>
-          <span className="flex items-center gap-1.5"><Cpu size={14} />Models</span>
+          <span className="flex items-center gap-1.5"><Cpu size={14} />{t('adminTabModels')}</span>
         </TabButton>
       </div>
 
