@@ -280,7 +280,7 @@ export function ChatWidget({
                 {pendingClarification && (
                   <div className="mx-3 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
                     <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                      Action required
+                      {t('clarificationActionRequired')}
                     </p>
                     <p className="text-xs text-foreground">{pendingClarification.prompt}</p>
                     {pendingClarification.questions.length > 0 && (

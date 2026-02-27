@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import DocumentsDashboard from '../DocumentsDashboard';
@@ -102,5 +103,26 @@ describe('DocumentsDashboard integration', () => {
     expect(screen.queryByText('Total Chunks')).not.toBeInTheDocument();
     expect(screen.queryByText('Embedding Model')).not.toBeInTheDocument();
     expect(screen.queryByText('Download')).not.toBeInTheDocument();
+  });
+
+  it('supports topic filtering and renders actionable source links', async () => {
+    const user = userEvent.setup();
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Example Source A')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'benefits (1)' }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Example Source A')).not.toBeInTheDocument();
+      expect(screen.getByText('Example Source B')).toBeInTheDocument();
+    });
+
+    const openSourceLink = screen.getByRole('link', { name: 'Open source' });
+    expect(openSourceLink).toHaveAttribute('href', 'https://example.org/b');
+    expect(openSourceLink).toHaveAttribute('target', '_blank');
   });
 });

@@ -160,7 +160,9 @@ describe('ChatPage', () => {
 
     render(<ChatPage />);
 
-    expect(screen.getByText('Action required')).toBeInTheDocument();
+    expect(
+      screen.getByText((text) => text === 'Action required' || text === 'clarificationActionRequired')
+    ).toBeInTheDocument();
     expect(screen.getByText('Please clarify your neighborhood')).toBeInTheDocument();
     expect(screen.getByText('1. What city are you in?')).toBeInTheDocument();
     expect(screen.getByText('2. Do you need immediate help?')).toBeInTheDocument();

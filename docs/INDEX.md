@@ -7,6 +7,7 @@ Welcome to the Vecinita frontend documentation. This directory is organized to h
 Start here if you're new to the project:
 
 - **[README.md](../README.md)** - Project overview, features, and quick links
+- **[../../docs/INDEX.md](../../docs/INDEX.md)** - Centralized monorepo docs hub
 - **[QUICK_START.md](./guides/QUICK_START.md)** - User guide with keyboard shortcuts and usage examples
 - **[CHATWIDGET_README.md](./reference/CHATWIDGET_README.md)** - Chat widget integration guide and component props
 
@@ -28,7 +29,7 @@ Documentation available at root level. Consider creating English-specific versio
 
 ## 📚 Reference & Legacy Documentation
 
-Historical documentation and reference material for the original full-featured Vecinita (with authentication, admin panel, and administrative features):
+Historical documentation and reference material for earlier iterations of Vecinita:
 
 ### Legacy Content in [docs/_legacy/](./_legacy/)
 
@@ -39,7 +40,7 @@ Historical documentation and reference material for the original full-featured V
 - **OPTIONAL_CLEANUP.md** - Record of cleanup decisions made during simplification
 - **SIMPLIFICATION_SUMMARY.md** - Changes from original to simplified version
 
-**Note:** These documents describe the original full-featured architecture. The current implementation is a simplified, session-based version without authentication or admin features.
+**Note:** These documents are archival context and may differ from current runtime behavior.
 
 ## 📖 Document Organization
 

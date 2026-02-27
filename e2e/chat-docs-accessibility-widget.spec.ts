@@ -2,18 +2,20 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Community flows', () => {
   test('documents links, chat interactions, accessibility controls, keyboard combos, and chat widget', async ({ page, context }) => {
+    const docsHealth = await page.request.get('/api/v1/documents/overview');
+    test.skip(!docsHealth.ok(), 'Requires running gateway/docs backend for full community flow e2e');
+
     await page.goto('/documents');
     await expect(page.getByRole('heading', { name: /Documents|Documentos/i })).toBeVisible();
 
     const sourceLinks = page.locator('table tbody a[href^="http"]');
-    if (await sourceLinks.count()) {
-      const [popup] = await Promise.all([
-        context.waitForEvent('page'),
-        sourceLinks.first().click(),
-      ]);
-      await expect(popup).toHaveURL(/https?:\/\//);
-      await popup.close();
-    }
+    await expect(sourceLinks.first()).toBeVisible();
+    const [popup] = await Promise.all([
+      context.waitForEvent('page'),
+      sourceLinks.first().click(),
+    ]);
+    await expect(popup).toHaveURL(/https?:\/\//);
+    await popup.close();
 
     await page.goto('/');
     await expect(page.getByRole('heading', { name: /Vecinita/i })).toBeVisible();
@@ -54,5 +56,14 @@ test.describe('Community flows', () => {
     await widgetComposer.fill('Widget test message');
     await page.getByRole('button', { name: /Send message|Enviar mensaje/i }).last().click();
     await expect(page.getByText('Widget test message')).toBeVisible();
+
+    await page.getByRole('link', { name: /Admin login/i }).click();
+    await expect(page).toHaveURL(/\/login\?redirect=%2Fadmin/);
+    await expect(page.getByRole('heading', { name: /Admin Login/i })).toBeVisible();
+    await expect(page.getByLabel('Email')).toBeVisible();
+    await expect(page.getByLabel('Password')).toBeVisible();
+
+    await page.getByRole('link', { name: /Browse documents/i }).click();
+    await expect(page).toHaveURL(/\/documents/);
   });
 });

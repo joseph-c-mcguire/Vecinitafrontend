@@ -42,6 +42,19 @@ interface PendingClarificationState {
 }
 
 export function useAgentChat(options: UseAgentChatOptions = {}) {
+  const locale: 'en' | 'es' = options.language === 'es' ? 'es' : 'en';
+  const copy = {
+    connecting: locale === 'es' ? 'Conectando con el backend...' : 'Connecting to backend...',
+    generating: locale === 'es' ? 'Generando respuesta...' : 'Generating response...',
+    clarificationNeeded: locale === 'es' ? 'Se necesita aclaración' : 'Clarification needed',
+    toolSummaryTitle: locale === 'es' ? 'Resumen de herramientas' : 'Tool Summary',
+    emptyResponse: locale === 'es'
+      ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
+      : 'I could not generate a response right now. Please try again.',
+    unexpectedError: locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
+    encounteredErrorPrefix: locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
+  };
+
   const serviceClient = options.service || agentService;
   const chatDebugEnabled =
     ((import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true')
@@ -126,7 +139,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       setIsLoading(true);
       setError(null);
-      setStreamingMessage('Connecting to backend...');
+      setStreamingMessage(copy.connecting);
       setProgressMessages([]);
       setStreamProgress({
         stage: 'Connecting',
@@ -134,7 +147,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         waiting: true,
         status: 'waiting',
       });
-      appendProgressMessage('⏳ Connecting to backend...');
+      appendProgressMessage(`⏳ ${copy.connecting}`);
 
       // Create and add user message immediately
       const userMessage: Message = {
@@ -234,7 +247,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 // Accumulate tokens as they stream in
                 assistantContent += (event.content || '');
                 // Update UI with streaming response
-                setStreamingMessage('Generating response...');
+                setStreamingMessage(copy.generating);
                 break;
 
               case 'source':
@@ -280,8 +293,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                     .slice(0, 3);
 
                   const displayMessage = clarificationQuestions.length > 0
-                    ? `Clarification needed:\n${clarificationMessage}\n\n${clarificationQuestions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
-                    : `Clarification needed: ${clarificationMessage}`;
+                    ? `${copy.clarificationNeeded}:\n${clarificationMessage}\n\n${clarificationQuestions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
+                    : `${copy.clarificationNeeded}: ${clarificationMessage}`;
                   setStreamingMessage(displayMessage);
                   appendProgressMessage(displayMessage);
                   updateProgressFromEvent({
@@ -353,7 +366,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         }
 
         if (!assistantContent.trim() && !sawClarificationEvent) {
-          assistantContent = 'I could not generate a response right now. Please try again.';
+          assistantContent = copy.emptyResponse;
           debugLog('empty_response:using_default_assistant_message', {
             question,
             threadId,
@@ -366,7 +379,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             .map(([toolName, summary]) => `• ${formatToolLabel(toolName)}\n  ${summary}`)
             .join('\n');
           appendAssistantEventMessage(
-            `Tool Summary\n────────────\n${toolSummary}`
+            `${copy.toolSummaryTitle}\n────────────\n${toolSummary}`
           );
         }
 
@@ -405,7 +418,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         let agentError =
           err instanceof AgentServiceError
             ? err
-            : new AgentServiceError('An unexpected error occurred');
+            : new AgentServiceError(copy.unexpectedError);
 
         try {
           const fallbackResponse = await serviceClient.ask(requestParams);
@@ -426,7 +439,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             const fallbackAssistantMessage: Message = {
               id: uuidv4(),
               role: 'assistant',
-              content: 'I could not generate a response right now. Please try again.',
+              content: copy.emptyResponse,
               timestamp: new Date(),
             };
             fallbackMessages = [...fallbackMessages, fallbackAssistantMessage];
@@ -454,7 +467,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           agentError =
             fallbackError instanceof AgentServiceError
               ? fallbackError
-              : new AgentServiceError('An unexpected error occurred');
+              : new AgentServiceError(copy.unexpectedError);
         }
 
         setError(agentError);
@@ -466,7 +479,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         const errorMessage: Message = {
           id: uuidv4(),
           role: 'assistant',
-          content: `Sorry, I encountered an error: ${agentError.message}`,
+          content: `${copy.encounteredErrorPrefix} ${agentError.message}`,
           timestamp: new Date(),
         };
 
@@ -495,6 +508,13 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       options.model,
       serviceClient,
       options.onError,
+      copy.clarificationNeeded,
+      copy.connecting,
+      copy.emptyResponse,
+      copy.encounteredErrorPrefix,
+      copy.generating,
+      copy.toolSummaryTitle,
+      copy.unexpectedError,
     ]
   );
 

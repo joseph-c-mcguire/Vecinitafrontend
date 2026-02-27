@@ -234,6 +234,10 @@ const translations: Translations = {
     en: 'Retry',
     es: 'Reintentar',
   },
+  clarificationActionRequired: {
+    en: 'Action required',
+    es: 'Acción requerida',
+  },
   documentsTitle: {
     en: 'Documents',
     es: 'Documentos',

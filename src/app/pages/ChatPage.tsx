@@ -100,7 +100,7 @@ export default function ChatPage() {
           {pendingClarification && (
             <div className="mx-4 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                Action required
+                {t('clarificationActionRequired')}
               </p>
               <p className="text-sm text-foreground">{pendingClarification.prompt}</p>
               {pendingClarification.questions.length > 0 && (
