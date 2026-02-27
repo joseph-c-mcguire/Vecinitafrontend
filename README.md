@@ -142,6 +142,38 @@ npx playwright install
 npm run test:e2e
 ```
 
+## ✅ Regression gates (obligatorio para cambios de UI de chat)
+
+Para evitar regresiones en `ChatPage`, `ChatWidget` y componentes compartidos de mensajes, ejecutar estos gates antes de merge:
+
+```bash
+# 1) Suite enfocada de chat (rápida, obligatoria)
+npm run test -- --run \
+  src/app/pages/__tests__/ChatPage.test.tsx \
+  src/app/components/__tests__/ChatWidget.test.tsx \
+  src/app/components/__tests__/ChatWidget.stream-success.integration.test.tsx \
+  src/app/components/__tests__/ChatMessage.sources.test.tsx \
+  src/app/components/__tests__/SourceCard.test.tsx \
+  src/app/components/__tests__/StreamingIndicator.test.tsx \
+  src/app/hooks/__tests__/useAgentChat.test.ts
+
+# 2) Suite completa frontend
+npm run test -- --run
+
+# 3) Build de producción
+npm run build
+```
+
+### E2E chat/accessibility (cuando haya backend activo)
+
+El spec `e2e/chat-docs-accessibility-widget.spec.ts` requiere API en `http://127.0.0.1:8004` (gateway) además del frontend.
+
+```bash
+npm run test:e2e -- e2e/chat-docs-accessibility-widget.spec.ts
+```
+
+Si el backend no está activo, Playwright fallará con `ECONNREFUSED 127.0.0.1:8004`.
+
 ## Estructura del Proyecto
 
 ```

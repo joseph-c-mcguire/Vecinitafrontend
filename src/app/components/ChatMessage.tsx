@@ -7,6 +7,9 @@ import { MessageFeedback, Feedback } from './MessageFeedback';
 import { useLanguage } from '../context/LanguageContext';
 import { useAccessibility } from '../context/AccessibilityContext';
 import type { Message as ConversationMessage } from '../hooks/useConversationStorage';
+import { Card } from './ui/card';
+import { Separator } from './ui/separator';
+import { cn } from './ui/utils';
 
 interface ChatMessageProps {
   message: ConversationMessage;
@@ -34,28 +37,31 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
 
   return (
     <div
-      className={`flex gap-2 sm:gap-3 p-3 sm:p-4 ${!isUser ? 'bg-muted/30' : ''}`}
+      className={cn('flex gap-2 p-3 sm:gap-3 sm:p-4', !isUser && 'bg-muted/30')}
       role="article"
       aria-label={`${isUser ? 'User' : 'Assistant'} message`}
     >
-      <div className={`w-6 h-6 sm:w-8 sm:h-8 rounded-full flex items-center justify-center shrink-0 ${
-        isUser ? 'bg-secondary' : 'bg-primary'
-      }`}>
+      <div
+        className={cn(
+          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full sm:h-8 sm:w-8',
+          isUser ? 'bg-secondary' : 'bg-primary'
+        )}
+      >
         {isUser ? (
           <User className="w-4 h-4 sm:w-5 sm:h-5 text-secondary-foreground" aria-hidden="true" />
         ) : (
           <Bot className="w-4 h-4 sm:w-5 sm:h-5 text-primary-foreground" aria-hidden="true" />
         )}
       </div>
-      <div className="flex-1 space-y-2 sm:space-y-3 min-w-0">
+      <div className="min-w-0 flex-1 space-y-2 sm:space-y-3">
         <div className="prose prose-sm max-w-none dark:prose-invert">
           {isToolSummary ? (
-            <div
+            <Card
               className="rounded-md border bg-background/60 p-3 text-sm text-foreground whitespace-pre-wrap break-words"
               onClick={handleTextClick}
             >
               {message.content}
-            </div>
+            </Card>
           ) : !isUser ? (
             <div className="text-sm sm:text-base text-foreground break-words" onClick={handleTextClick}>
               <ReactMarkdown
@@ -97,6 +103,7 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
         </div>
         {message.sources && message.sources.length > 0 && (
           <div className="space-y-2">
+            <Separator />
             <h3 className="text-xs sm:text-sm text-muted-foreground" id={`sources-${message.id}`}>
               {t('sources')}:
             </h3>

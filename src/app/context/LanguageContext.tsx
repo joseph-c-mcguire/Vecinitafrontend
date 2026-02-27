@@ -370,6 +370,30 @@ const translations: Translations = {
     en: 'Add New Source',
     es: 'Agregar nueva fuente',
   },
+  adminBatchIngestTitle: {
+    en: 'Batch URL Ingest',
+    es: 'Ingesta masiva de URL',
+  },
+  adminBatchUrlsPlaceholder: {
+    en: 'Paste urls.txt content (one URL per line)',
+    es: 'Pega el contenido de urls.txt (una URL por línea)',
+  },
+  adminBatchTagModeLabel: {
+    en: 'Tag mode',
+    es: 'Modo de etiquetas',
+  },
+  adminBatchTagModeAutoInfer: {
+    en: 'Auto-infer + baseline tags',
+    es: 'Auto-inferir + etiquetas base',
+  },
+  adminBatchIngest: {
+    en: 'Batch ingest',
+    es: 'Ingesta masiva',
+  },
+  adminBatchResult: {
+    en: 'Batch ingest: {completed}/{submitted} completed ({failed} failed).',
+    es: 'Ingesta masiva: {completed}/{submitted} completadas ({failed} fallidas).',
+  },
   adminCrawlDepth: {
     en: 'Crawl depth',
     es: 'Profundidad de rastreo',

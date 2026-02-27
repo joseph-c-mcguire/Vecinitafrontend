@@ -31,6 +31,7 @@ import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
 import {
   addSource,
+  addSourcesBatch,
   deleteSource,
   getQueue,
   uploadDocument,
@@ -43,6 +44,10 @@ import {
   type QueueJob,
   type QueueStatusSummaryItem,
 } from '../services/adminService';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Label } from '../components/ui/label';
 
 function formatTranslation(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce(
@@ -63,16 +68,17 @@ function TabButton({
   children: React.ReactNode;
 }) {
   return (
-    <button
+    <Button
       onClick={onClick}
-      className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+      variant={active ? 'secondary' : 'ghost'}
+      className={`rounded-t-lg ${
         active
-          ? 'bg-card border border-b-card text-foreground -mb-px'
-          : 'text-muted-foreground hover:text-foreground'
+          ? 'border border-b-card text-foreground -mb-px'
+          : 'text-muted-foreground'
       }`}
     >
       {children}
-    </button>
+    </Button>
   );
 }
 
@@ -141,6 +147,9 @@ function SourcesTab() {
   const [editingUrl, setEditingUrl] = useState<string | null>(null);
   const [editingTagsText, setEditingTagsText] = useState('');
   const [tagsText, setTagsText] = useState('');
+  const [batchUrlsText, setBatchUrlsText] = useState('');
+  const [batchTagsText, setBatchTagsText] = useState('');
+  const [batchAdding, setBatchAdding] = useState(false);
   const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -200,6 +209,32 @@ function SourcesTab() {
     }
   };
 
+  const handleBatchAdd = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!batchUrlsText.trim()) return;
+    setBatchAdding(true);
+    setMessage(null);
+    try {
+      const normalizedTags = normalizeTagsFromInput(batchTagsText);
+      const result = await addSourcesBatch(batchUrlsText, depth, normalizedTags, 'auto_infer');
+      setMessage({
+        text: formatTranslation(t('adminBatchResult'), {
+          completed: result.completed,
+          submitted: result.submitted,
+          failed: result.failed,
+        }),
+        ok: result.failed === 0,
+      });
+      setBatchUrlsText('');
+      setBatchTagsText('');
+      await load();
+    } catch (e) {
+      setMessage({ text: String(e), ok: false });
+    } finally {
+      setBatchAdding(false);
+    }
+  };
+
   const startEditTags = (source: SourceRow) => {
     setEditingUrl(source.url);
     setEditingTagsText(tagsToText(source.tags));
@@ -243,16 +278,20 @@ function SourcesTab() {
   return (
     <div className="space-y-6">
       {/* Add source form */}
-      <form onSubmit={handleAdd} className="rounded-xl border bg-card p-4 space-y-3">
-        <h3 className="font-medium text-sm">{t('adminAddNewSource')}</h3>
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{t('adminAddNewSource')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAdd} className="space-y-3">
         <div className="flex gap-2">
-          <input
+          <Input
             type="url"
             placeholder="https://example.com/page"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             required
-            className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+            className="flex-1"
           />
           <select
             value={depth}
@@ -264,23 +303,21 @@ function SourcesTab() {
               <option key={d} value={d}>{t('adminDepth')} {d}</option>
             ))}
           </select>
-          <button
+          <Button
             type="submit"
             disabled={adding}
-            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
           >
             {adding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
             {t('adminAdd')}
-          </button>
+          </Button>
         </div>
         <div className="space-y-1">
-          <input
+          <Input
             type="text"
             value={tagsText}
             onChange={(e) => setTagsText(e.target.value)}
             list="admin-tag-suggestions"
             placeholder={t('adminTagsPlaceholder')}
-            className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
           />
           <p className="text-xs text-muted-foreground">{t('adminTagsAutocompleteHint')}</p>
         </div>
@@ -289,7 +326,54 @@ function SourcesTab() {
             <option key={tag} value={tag} />
           ))}
         </datalist>
-      </form>
+          </form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">{t('adminBatchIngestTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleBatchAdd} className="space-y-3">
+        <textarea
+          value={batchUrlsText}
+          onChange={(e) => setBatchUrlsText(e.target.value)}
+          placeholder={t('adminBatchUrlsPlaceholder')}
+          className="w-full min-h-36 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+          required
+        />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">{t('adminBatchTagModeLabel')}</Label>
+            <Input
+              type="text"
+              value={t('adminBatchTagModeAutoInfer')}
+              readOnly
+              className="text-muted-foreground"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">{t('adminTags')}</Label>
+            <Input
+              type="text"
+              value={batchTagsText}
+              onChange={(e) => setBatchTagsText(e.target.value)}
+              list="admin-tag-suggestions"
+              placeholder={t('adminTagsPlaceholder')}
+            />
+          </div>
+        </div>
+        <Button
+          type="submit"
+          disabled={batchAdding}
+        >
+          {batchAdding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
+          {t('adminBatchIngest')}
+        </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       {message && (
         <div
@@ -306,9 +390,9 @@ function SourcesTab() {
       <div className="rounded-xl border overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">
           <span className="text-sm font-medium">{sources.length} {t('adminSourcesCount')}</span>
-          <button onClick={load} className="p-1 rounded hover:bg-accent transition-colors" title={t('adminRefresh')}>
+          <Button onClick={load} size="icon" variant="ghost" title={t('adminRefresh')}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          </button>
+          </Button>
         </div>
         <table className="w-full text-sm">
           <thead className="text-xs uppercase tracking-wide text-muted-foreground bg-muted/20">
@@ -338,19 +422,20 @@ function SourcesTab() {
                 <td className="px-4 py-3">
                   {editingUrl === s.url ? (
                     <div className="flex items-center gap-2">
-                      <input
+                      <Input
                         type="text"
                         value={editingTagsText}
                         onChange={(e) => setEditingTagsText(e.target.value)}
                         list="admin-tag-suggestions"
-                        className="w-full rounded-md border bg-background px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        className="h-8 text-xs"
                       />
-                      <button
+                      <Button
                         onClick={() => handleSaveTags(s.url)}
-                        className="rounded border px-2 py-1 text-xs hover:bg-accent"
+                        variant="outline"
+                        size="sm"
                       >
                         {t('adminSave')}
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <span className="text-xs text-muted-foreground truncate block max-w-56" title={tagsToText(s.tags)}>
@@ -361,24 +446,26 @@ function SourcesTab() {
                 <td className="px-4 py-3 text-right font-mono text-xs">{s.total_chunks}</td>
                 <td className="px-4 py-3 text-center">
                   <div className="inline-flex items-center gap-1">
-                    <button
+                    <Button
                       onClick={() => startEditTags(s)}
-                      className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                      size="icon"
+                      variant="ghost"
                       title={t('adminEditTagsTitle')}
                     >
                       <Pencil size={14} />
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       onClick={() => handleDelete(s.url)}
                       disabled={deletingUrl === s.url}
-                      className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                      size="icon"
+                      variant="ghost"
                       title={t('adminDeleteChunks')}
                     >
                       {deletingUrl === s.url
                         ? <Loader2 size={14} className="animate-spin" />
                         : <Trash2 size={14} />
                       }
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -841,6 +928,17 @@ export default function AdminDashboard() {
       <div>
         <h1 className="text-2xl font-bold">{t('adminTitle')}</h1>
         <p className="text-muted-foreground mt-1">{t('adminSubtitle')}</p>
+        <p className="text-xs text-muted-foreground mt-2">
+          UI issues or feedback:{' '}
+          <a
+            href="https://github.com/acadiagit/vecinita/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-primary hover:underline"
+          >
+            https://github.com/acadiagit/vecinita/issues
+          </a>
+        </p>
       </div>
 
       {/* Tabs */}

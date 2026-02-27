@@ -8,6 +8,7 @@ import { LanguageProvider } from '../../context/LanguageContext';
 
 const mockNavigate = vi.fn();
 const mockAddSource = vi.fn();
+const mockAddSourcesBatch = vi.fn();
 const mockDeleteSource = vi.fn();
 const mockGetQueue = vi.fn();
 const mockUploadDocument = vi.fn();
@@ -34,6 +35,7 @@ vi.mock('react-router-dom', async (importOriginal) => {
 
 vi.mock('../../services/adminService', () => ({
   addSource: (...args: unknown[]) => mockAddSource(...args),
+  addSourcesBatch: (...args: unknown[]) => mockAddSourcesBatch(...args),
   deleteSource: (...args: unknown[]) => mockDeleteSource(...args),
   getQueue: (...args: unknown[]) => mockGetQueue(...args),
   uploadDocument: (...args: unknown[]) => mockUploadDocument(...args),
@@ -62,6 +64,19 @@ describe('AdminDashboard integration', () => {
       total: 1,
     });
     mockAddSource.mockResolvedValue({ status: 'completed', url: 'https://example.com', depth: 1, tags: ['housing'], chunks_inserted: 3, chunks_total: 3 });
+    mockAddSourcesBatch.mockResolvedValue({
+      status: 'partial',
+      submitted: 2,
+      completed: 1,
+      failed: 1,
+      depth: 1,
+      tag_mode: 'auto_infer',
+      baseline_tags: ['housing'],
+      results: [
+        { url: 'https://example.com/new-1', status: 'completed' },
+        { url: 'https://example.com/new-2', status: 'failed', error: 'HTTP 500' },
+      ],
+    });
     mockUpdateSourceTags.mockResolvedValue({ status: 'updated', url: 'https://example.com', tags: ['housing', 'food'], chunks_updated: 2 });
     mockGetModelConfig.mockResolvedValue({
       generation: {
@@ -95,7 +110,7 @@ describe('AdminDashboard integration', () => {
     await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
 
     await user.type(screen.getByPlaceholderText('https://example.com/page'), 'https://example.com/new');
-    await user.type(screen.getByPlaceholderText('Tags (comma separated, optional)'), 'Housing, Food, food');
+    await user.type(screen.getAllByPlaceholderText('Tags (comma separated, optional)')[0], 'Housing, Food, food');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() => {
@@ -127,6 +142,36 @@ describe('AdminDashboard integration', () => {
 
     await waitFor(() => {
       expect(mockUpdateSourceTags).toHaveBeenCalledWith('https://example.com', ['housing', 'food'], 'en');
+    });
+  });
+
+  it('submits batch source ingest with auto-infer mode', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <LanguageProvider>
+        <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <AdminDashboard />
+        </MemoryRouter>
+      </LanguageProvider>
+    );
+
+    await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
+
+    await user.type(
+      screen.getByPlaceholderText('Paste urls.txt content (one URL per line)'),
+      'https://example.com/new-1\nhttps://example.com/new-2'
+    );
+    await user.type(screen.getAllByPlaceholderText('Tags (comma separated, optional)')[1], 'Housing, food');
+    await user.click(screen.getByRole('button', { name: 'Batch ingest' }));
+
+    await waitFor(() => {
+      expect(mockAddSourcesBatch).toHaveBeenCalledWith(
+        'https://example.com/new-1\nhttps://example.com/new-2',
+        1,
+        ['housing', 'food'],
+        'auto_infer'
+      );
     });
   });
 
@@ -184,7 +229,7 @@ describe('AdminDashboard integration', () => {
     expect(screen.getByText('Subir')).toBeInTheDocument();
     expect(screen.getByText('Cola')).toBeInTheDocument();
     expect(screen.getByText('Modelos')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Etiquetas (separadas por comas, opcional)')).toBeInTheDocument();
+    expect(screen.getAllByPlaceholderText('Etiquetas (separadas por comas, opcional)').length).toBeGreaterThan(0);
     expect(screen.getByText('Autocompletado con etiquetas existentes. Puedes agregar etiquetas personalizadas.')).toBeInTheDocument();
   });
 

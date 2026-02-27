@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   addSource,
+  addSourcesBatch,
   getMetadataTags,
   getSources,
   updateSourceTags,
@@ -45,6 +46,41 @@ describe('adminService', () => {
     expect(body.get('url')).toBe('https://example.com');
     expect(body.get('depth')).toBe('1');
     expect(body.get('tags')).toBe('housing');
+  });
+
+  it('sends batch urls payload for sources batch ingestion', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          status: 'partial',
+          submitted: 2,
+          completed: 1,
+          failed: 1,
+          depth: 1,
+          tag_mode: 'auto_infer',
+          baseline_tags: ['housing'],
+          results: [],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    );
+
+    await addSourcesBatch('https://example.com\nhttps://example.org', 2, ['housing'], 'auto_infer');
+
+    const call = vi.mocked(fetch).mock.calls[0];
+    expect(call[1]?.method).toBe('POST');
+    expect(call[0]).toContain('/admin/sources/batch');
+    expect(call[1]?.body).toBe(
+      JSON.stringify({
+        urls_text: 'https://example.com\nhttps://example.org',
+        depth: 2,
+        tags: ['housing'],
+        tag_mode: 'auto_infer',
+      })
+    );
   });
 
   it('sends tags during upload', async () => {
@@ -159,5 +195,31 @@ describe('adminService', () => {
     expect(callUrl).toContain('query=ho');
     expect(callUrl).toContain('limit=10');
     expect(callUrl).toContain('lang=es');
+  });
+
+  it('retries admin request on network fetch failure', async () => {
+    vi.mocked(fetch)
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            sources: [
+              {
+                url: 'https://example.org',
+                chunk_count: 2,
+                metadata: { tags: ['test'] },
+                is_active: true,
+              },
+            ],
+            total: 1,
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      );
+
+    const result = await getSources();
+    expect(result.total).toBe(1);
+    expect(result.sources[0].url).toBe('https://example.org');
+    expect(vi.mocked(fetch).mock.calls.length).toBe(2);
   });
 });

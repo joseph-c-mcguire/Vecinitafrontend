@@ -11,6 +11,9 @@ import { useAgentChat } from '../hooks/useAgentChat';
 import { ChatMessage } from '../components/ChatMessage';
 import { StreamingIndicator } from '../components/StreamingIndicator';
 import { ChatWidget } from '../components/ChatWidget';
+import { Button } from '../components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader } from '../components/ui/card';
+import { Separator } from '../components/ui/separator';
 
 export default function ChatPage() {
   const { t, language } = useLanguage();
@@ -56,6 +59,10 @@ export default function ChatPage() {
     }
   };
 
+  const progressHint = isLoading && !streamingMessage && progressMessages.length > 0
+    ? progressMessages[progressMessages.length - 1]
+    : undefined;
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">
       <div className="mb-4 flex items-start justify-between gap-3">
@@ -63,17 +70,19 @@ export default function ChatPage() {
           <h1 className="text-2xl font-bold">{t('appTitle')}</h1>
           <p className="text-sm text-muted-foreground">{t('appSubtitle')}</p>
         </div>
-        <button
+        <Button
           onClick={() => clearThread()}
-          className="rounded-md border bg-background px-3 py-2 text-sm hover:bg-accent"
+          variant="outline"
+          size="sm"
           type="button"
         >
           {t('newChat')}
-        </button>
+        </Button>
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
-        <div className="flex-1 overflow-y-auto">
+      <Card className="flex flex-1 flex-col overflow-hidden shadow-sm">
+        <CardHeader className="p-0" />
+        <CardContent className="flex-1 overflow-y-auto p-0">
           {messages.length === 0 && (
             <div className="p-8 text-center text-muted-foreground">
               <MessageSquare className="mx-auto mb-3 h-6 w-6" />
@@ -85,7 +94,9 @@ export default function ChatPage() {
             <ChatMessage key={message.id} message={message} />
           ))}
 
-          {streamingMessage && <StreamingIndicator message={streamingMessage} />}
+          {(streamingMessage || progressHint) && (
+            <StreamingIndicator message={streamingMessage || progressHint} />
+          )}
           {pendingClarification && (
             <div className="mx-4 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
@@ -101,34 +112,6 @@ export default function ChatPage() {
               )}
             </div>
           )}
-          {isLoading && progressMessages.length > 0 && (
-            <div className="mx-4 mb-3 rounded-md border bg-muted/40 p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {streamProgress.stage} · {streamProgress.percent}%
-                </p>
-                {streamProgress.waiting && (
-                  <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                    Waiting
-                  </span>
-                )}
-              </div>
-              <div className="mb-3 h-1.5 w-full overflow-hidden rounded bg-muted">
-                <div
-                  className="h-full rounded bg-primary transition-all"
-                  style={{ width: `${streamProgress.percent}%` }}
-                />
-              </div>
-              <ul className="space-y-1">
-                {progressMessages.slice(-5).map((item, index) => (
-                  <li key={`${index}-${item}`} className="text-sm text-muted-foreground">
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
           {error && (
             <div className="m-4 rounded-lg border border-destructive bg-destructive/10 p-4">
               <p className="mb-2 text-sm font-medium text-destructive">{t('error.title')}</p>
@@ -145,30 +128,31 @@ export default function ChatPage() {
           )}
 
           <div ref={messagesEndRef} />
-        </div>
+        </CardContent>
 
-        <div className="border-t bg-background p-3">
-          <form onSubmit={handleSubmit} className="flex gap-2">
+        <Separator />
+        <CardFooter className="bg-background p-3">
+          <form onSubmit={handleSubmit} className="flex w-full items-end gap-2">
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={t('typePlaceholder')}
-              className="min-h-[42px] flex-1 resize-none rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-              rows={1}
+              className="min-h-[56px] w-full min-w-0 flex-1 resize-none rounded-md border bg-background px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary/40"
+              rows={2}
               disabled={isLoading}
             />
-            <button
+            <Button
               type="submit"
               disabled={!input.trim() || isLoading}
-              className="rounded-md bg-primary px-3 py-2 text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              size="icon"
               aria-label={t('sendMessage')}
             >
               <Send className="h-4 w-4" />
-            </button>
+            </Button>
           </form>
-        </div>
-      </div>
+        </CardFooter>
+      </Card>
 
       <ChatWidget defaultOpen={false} zIndex={1300} />
     </main>

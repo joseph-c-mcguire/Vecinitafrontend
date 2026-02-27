@@ -8,7 +8,25 @@
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '../../lib/supabase';
 
 const DEV_ADMIN_ENABLED = (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
-const DEV_ADMIN_STORAGE_KEY = 'vecinita-dev-admin-session';
+const DEV_ADMIN_STORAGE_KEY = 'vecinita-dev-admin-session'
+function _getDevAdminToken(): string | null {
+  if (!DEV_ADMIN_ENABLED) {
+    return null;
+  }
+
+  const raw = localStorage.getItem(DEV_ADMIN_STORAGE_KEY);
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as { token?: string };
+    return parsed.token ?? null;
+  } catch {
+    localStorage.removeItem(DEV_ADMIN_STORAGE_KEY);
+    return null;
+  }
+}
 
 function resolveApiBase(rawUrl: string): string {
   if (typeof window === 'undefined') {
@@ -48,34 +66,81 @@ const API_BASE = resolveApiBase(
     (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1')
 );
 
+function _candidateApiBases(): string[] {
+  const candidates: string[] = [API_BASE];
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname } = window.location;
+    candidates.push('/api/v1');
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') {
+      candidates.push('http://localhost:18004/api/v1');
+      candidates.push('http://localhost:8004/api/v1');
+    } else {
+      candidates.push(`${protocol}//${hostname}:18004/api/v1`);
+      candidates.push(`${protocol}//${hostname}:8004/api/v1`);
+    }
+  }
+
+  return Array.from(new Set(candidates.map((item) => item.replace(/\/+$/, ''))));
+}
+
+function _isNetworkFetchError(error: unknown): boolean {
+  if (!(error instanceof TypeError)) {
+    return false;
+  }
+  const message = String(error.message || '').toLowerCase();
+  return message.includes('fetch') || message.includes('network');
+}
+
+async function _fetchAdmin(path: string, init?: RequestInit): Promise<Response> {
+  const bases = _candidateApiBases();
+  let lastError: unknown;
+
+  for (const base of bases) {
+    try {
+      return await fetch(`${base}${path}`, init);
+    } catch (error) {
+      lastError = error;
+      if (!_isNetworkFetchError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new TypeError('Failed to fetch');
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 async function _getToken(): Promise<string> {
+  const devAdminToken = _getDevAdminToken();
+  if (devAdminToken) {
+    return devAdminToken;
+  }
+
   if (!isSupabaseConfigured || !supabase) {
-    if (DEV_ADMIN_ENABLED) {
-      const raw = localStorage.getItem(DEV_ADMIN_STORAGE_KEY);
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as { token?: string };
-          if (parsed.token) {
-            return parsed.token;
-          }
-        } catch {
-          localStorage.removeItem(DEV_ADMIN_STORAGE_KEY);
-        }
-      }
-    }
     throw new Error(supabaseConfigError);
   }
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
-  if (!session?.access_token) {
-    throw new Error('Not authenticated. Please sign in.');
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session?.access_token) {
+      throw new Error('Not authenticated. Please sign in.');
+    }
+    return session.access_token;
+  } catch (error) {
+    const fallbackToken = _getDevAdminToken();
+    if (fallbackToken) {
+      return fallbackToken;
+    }
+    throw error;
   }
-  return session.access_token;
 }
 
 async function _authHeaders(): Promise<HeadersInit> {
@@ -130,6 +195,22 @@ export interface AddSourceResult {
   job_id?: string;
 }
 
+export interface BatchAddSourcesResult {
+  status: 'completed' | 'partial';
+  submitted: number;
+  completed: number;
+  failed: number;
+  depth: number;
+  tag_mode: 'none' | 'baseline_only' | 'auto_infer';
+  baseline_tags: string[];
+  results: Array<{
+    url: string;
+    status: 'completed' | 'failed';
+    error?: string;
+    result?: AddSourceResult;
+  }>;
+}
+
 export async function addSource(url: string, depth = 1, tags: string[] = []): Promise<AddSourceResult> {
   const headers = await _authHeaders();
   const form = new FormData();
@@ -140,7 +221,7 @@ export async function addSource(url: string, depth = 1, tags: string[] = []): Pr
   }
   // Remove Content-Type header — browser sets it with the correct boundary for FormData
   delete (headers as Record<string, string>)['Content-Type'];
-  const res = await fetch(`${API_BASE}/admin/sources`, {
+  const res = await _fetchAdmin('/admin/sources', {
     method: 'POST',
     headers,
     body: form,
@@ -148,10 +229,33 @@ export async function addSource(url: string, depth = 1, tags: string[] = []): Pr
   return _handleResponse<AddSourceResult>(res);
 }
 
+export async function addSourcesBatch(
+  urlsText: string,
+  depth = 1,
+  tags: string[] = [],
+  tagMode: 'none' | 'baseline_only' | 'auto_infer' = 'auto_infer'
+): Promise<BatchAddSourcesResult> {
+  const headers = await _authHeaders();
+  const res = await _fetchAdmin('/admin/sources/batch', {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      urls_text: urlsText,
+      depth,
+      tags,
+      tag_mode: tagMode,
+    }),
+  });
+  return _handleResponse<BatchAddSourcesResult>(res);
+}
+
 export async function deleteSource(url: string): Promise<{ status: string; chunks_deleted: number }> {
   const headers = await _authHeaders();
-  const res = await fetch(
-    `${API_BASE}/admin/sources?url=${encodeURIComponent(url)}`,
+  const res = await _fetchAdmin(
+    `/admin/sources?url=${encodeURIComponent(url)}`,
     { method: 'DELETE', headers },
   );
   return _handleResponse(res);
@@ -162,13 +266,13 @@ export async function getQueue(
 ): Promise<{ jobs: QueueJob[]; total: number }> {
   const headers = await _authHeaders();
   const params = status ? `?status=${encodeURIComponent(status)}` : '';
-  const res = await fetch(`${API_BASE}/admin/queue${params}`, { headers });
+  const res = await _fetchAdmin(`/admin/queue${params}`, { headers });
   return _handleResponse(res);
 }
 
 export async function getQueueStatusSummary(): Promise<{ statuses: QueueStatusSummaryItem[]; total_jobs: number }> {
   const headers = await _authHeaders();
-  const res = await fetch(`${API_BASE}/admin/queue/status-summary`, { headers });
+  const res = await _fetchAdmin('/admin/queue/status-summary', { headers });
   return _handleResponse(res);
 }
 
@@ -194,7 +298,7 @@ export async function uploadDocument(file: File, tags: string[] = []): Promise<U
   if (tags.length > 0) {
     form.append('tags', tags.join(','));
   }
-  const res = await fetch(`${API_BASE}/admin/upload`, {
+  const res = await _fetchAdmin('/admin/upload', {
     method: 'POST',
     headers,
     body: form,
@@ -215,7 +319,7 @@ export interface AdminStats {
 
 export async function getAdminStats(): Promise<AdminStats> {
   const headers = await _authHeaders();
-  const res = await fetch(`${API_BASE}/admin/stats`, { headers });
+  const res = await _fetchAdmin('/admin/stats', { headers });
   return _handleResponse<AdminStats>(res);
 }
 
@@ -242,7 +346,7 @@ export interface AdminSource {
 export async function getSources(page = 1, limit = 50): Promise<{ sources: AdminSource[]; total: number }> {
   const headers = await _authHeaders();
   const offset = (page - 1) * limit;
-  const res = await fetch(`${API_BASE}/admin/sources?limit=${limit}&offset=${offset}`, { headers });
+  const res = await _fetchAdmin(`/admin/sources?limit=${limit}&offset=${offset}`, { headers });
   const payload = await _handleResponse<{ sources: any[]; total: number }>(res);
   const toMetadataObject = (raw: unknown): Record<string, unknown> => {
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -286,7 +390,7 @@ export async function updateSourceTags(
 ): Promise<{ status: string; chunks_updated: number; tags: string[]; message?: string }> {
   const headers = await _authHeaders();
   const params = new URLSearchParams({ lang });
-  const res = await fetch(`${API_BASE}/admin/sources/tags?${params.toString()}`, {
+  const res = await _fetchAdmin(`/admin/sources/tags?${params.toString()}`, {
     method: 'PATCH',
     headers: {
       ...headers,
@@ -303,7 +407,7 @@ export async function getMetadataTags(query = '', limit = 100, lang: 'en' | 'es'
   if (query) params.set('query', query);
   params.set('limit', String(limit));
   params.set('lang', lang);
-  const res = await fetch(`${API_BASE}/admin/tags?${params.toString()}`, { headers });
+  const res = await _fetchAdmin(`/admin/tags?${params.toString()}`, { headers });
   return _handleResponse(res);
 }
 
@@ -331,13 +435,13 @@ export interface AdminModelConfigUpdateRequest {
 
 export async function getModelConfig(): Promise<AdminModelConfigResponse> {
   const headers = await _authHeaders();
-  const res = await fetch(`${API_BASE}/admin/models/config`, { headers });
+  const res = await _fetchAdmin('/admin/models/config', { headers });
   return _handleResponse(res);
 }
 
 export async function updateModelConfig(payload: AdminModelConfigUpdateRequest): Promise<any> {
   const headers = await _authHeaders();
-  const res = await fetch(`${API_BASE}/admin/models/config`, {
+  const res = await _fetchAdmin('/admin/models/config', {
     method: 'POST',
     headers: {
       ...headers,

@@ -7,6 +7,8 @@
 
 import { Loader2 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { Card } from './ui/card';
+import { cn } from './ui/utils';
 
 interface StreamingIndicatorProps {
   message?: string;
@@ -20,8 +22,8 @@ export function StreamingIndicator({
   const { t } = useLanguage();
 
   return (
-    <div
-      className={`flex items-start gap-3 p-4 rounded-lg bg-muted/50 border border-border ${className}`}
+    <Card
+      className={cn('flex items-start gap-3 rounded-lg border-border bg-muted/50 p-4', className)}
       role="status"
       aria-live="polite"
       aria-label={t('assistant.thinking')}
@@ -37,7 +39,7 @@ export function StreamingIndicator({
           </p>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
