@@ -95,6 +95,44 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     });
   }, []);
 
+  const localizeStreamMessage = useCallback((message?: string) => {
+    const raw = (message || '').trim();
+    if (!raw || locale !== 'es') {
+      return raw;
+    }
+
+    const exactMap: Record<string, string> = {
+      'Checking if I already know this...': 'Verificando si ya conozco esto...',
+      'Looking through our local resources...': 'Revisando nuestros recursos locales...',
+      'I need a bit more information...': 'Necesito un poco mas de informacion...',
+      'Searching for additional information...': 'Buscando informacion adicional...',
+      'Let me think about your question...': 'Dejame pensar en tu pregunta...',
+      'Understanding your question...': 'Entendiendo tu pregunta...',
+      'Finding relevant information...': 'Encontrando informacion relevante...',
+      'Finalizing answer...': 'Finalizando respuesta...',
+      'User clarification is required.': 'Se requieren aclaraciones del usuario.',
+      'Tool call completed.': 'Herramienta completada.',
+      'I need more details to continue.': 'Necesito mas informacion para continuar.',
+      'Service temporarily unavailable. Please try again in a moment.': 'Servicio temporalmente no disponible. Intentalo de nuevo en un momento.',
+    };
+
+    if (exactMap[raw]) {
+      return exactMap[raw];
+    }
+
+    const dbSearchSummary = raw.match(/^db_search returned (\d+) relevant chunks\.$/i);
+    if (dbSearchSummary) {
+      return `db_search devolvio ${dbSearchSummary[1]} fragmentos relevantes.`;
+    }
+
+    const webSearchSummary = raw.match(/^web_search returned (\d+) web results\.$/i);
+    if (webSearchSummary) {
+      return `web_search devolvio ${webSearchSummary[1]} resultados web.`;
+    }
+
+    return raw;
+  }, [locale]);
+
   const formatStageLabel = useCallback((stage?: string) => {
     if (!stage) {
       return 'Working';
@@ -238,9 +276,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             debugLog('stream:event', { type: event.type, count: streamEventCount });
             switch (event.type) {
               case 'thinking':
-                setStreamingMessage(event.message);
+                setStreamingMessage(localizeStreamMessage(event.message));
                 updateProgressFromEvent(event);
-                appendProgressMessage(`• ${event.message}`);
+                appendProgressMessage(`• ${localizeStreamMessage(event.message)}`);
                 break;
 
               case 'token':
@@ -284,7 +322,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 // Handle clarification requests
                 {
                   sawClarificationEvent = true;
-                  const clarificationMessage = event.message
+                  const clarificationMessage = localizeStreamMessage(event.message)
                     || (event.questions && event.questions.length > 0
                       ? event.questions.join(' ')
                       : 'Please provide more details so I can continue.');
@@ -326,17 +364,18 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
                 );
 
               case 'tool_event':
-                setStreamingMessage(event.message);
+                setStreamingMessage(localizeStreamMessage(event.message));
                 updateProgressFromEvent(event);
+                const localizedToolMessage = localizeStreamMessage(event.message);
                 if (event.phase === 'start') {
-                  appendProgressMessage(`⏳ ${event.message}`);
+                  appendProgressMessage(`⏳ ${localizedToolMessage}`);
                 } else if (event.phase === 'result') {
-                  appendProgressMessage(`✅ ${event.message}`);
+                  appendProgressMessage(`✅ ${localizedToolMessage}`);
                 } else {
-                  appendProgressMessage(`⚠️ ${event.message}`);
+                  appendProgressMessage(`⚠️ ${localizedToolMessage}`);
                 }
                 if (event.phase === 'result' && event.tool && event.message) {
-                  latestToolResults.set(event.tool, event.message);
+                  latestToolResults.set(event.tool, localizedToolMessage);
                 }
                 break;
             }
@@ -502,6 +541,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       storage,
       appendProgressMessage,
       formatStageLabel,
+      localizeStreamMessage,
       pendingClarification,
       options.language,
       options.provider,

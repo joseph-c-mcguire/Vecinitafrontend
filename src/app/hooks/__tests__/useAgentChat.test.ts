@@ -287,6 +287,67 @@ describe('useAgentChat', () => {
       expect(result.current.threadId).not.toBe(initialThreadId);
     });
 
+    it('should localize stream progress/status messages in Spanish mode', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({ type: 'thinking', message: 'Checking if I already know this...' });
+        onEvent({
+          type: 'tool_event',
+          phase: 'result',
+          tool: 'db_search',
+          message: 'db_search returned 2 relevant chunks.',
+        });
+        onEvent({ type: 'thinking', message: 'Finalizing answer...' });
+        onEvent({
+          type: 'complete',
+          answer: 'Respuesta final',
+          sources: [],
+        });
+      });
+
+      const { result } = renderHook(() => useAgentChat({ language: 'es' }));
+
+      await act(async () => {
+        await result.current.sendMessage('Necesito ayuda');
+      });
+
+      const progressText = result.current.progressMessages.join('\n');
+      expect(progressText).toContain('Verificando si ya conozco esto...');
+      expect(progressText).toContain('db_search devolvio 2 fragmentos relevantes.');
+      expect(progressText).toContain('Finalizando respuesta...');
+      expect(progressText).not.toContain('Checking if I already know this...');
+      expect(progressText).not.toContain('Finalizing answer...');
+    });
+
+    it('should keep stream progress/status messages in English mode unchanged', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({ type: 'thinking', message: 'Checking if I already know this...' });
+        onEvent({
+          type: 'tool_event',
+          phase: 'result',
+          tool: 'db_search',
+          message: 'db_search returned 2 relevant chunks.',
+        });
+        onEvent({ type: 'thinking', message: 'Finalizing answer...' });
+        onEvent({
+          type: 'complete',
+          answer: 'Final answer',
+          sources: [],
+        });
+      });
+
+      const { result } = renderHook(() => useAgentChat({ language: 'en' }));
+
+      await act(async () => {
+        await result.current.sendMessage('I need help');
+      });
+
+      const progressText = result.current.progressMessages.join('\n');
+      expect(progressText).toContain('Checking if I already know this...');
+      expect(progressText).toContain('db_search returned 2 relevant chunks.');
+      expect(progressText).toContain('Finalizing answer...');
+      expect(progressText).not.toContain('Verificando si ya conozco esto...');
+    });
+
     it('should persist clarification event as assistant message', async () => {
       vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         onEvent({
