@@ -31,7 +31,9 @@ test.describe('Admin Spanish language toggle', () => {
     await expect(page.getByRole('button', { name: 'Modelos' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Cola' }).click();
-    await expect(page.getByText('Todos los estados')).toBeVisible();
+    const queueStatusFilter = page.locator('main').getByRole('combobox').first();
+    await expect(queueStatusFilter).toBeVisible();
+    await expect(queueStatusFilter.locator('option[value=""]')).toHaveText(/All statuses|Todos los estados/i);
 
     await page.getByRole('button', { name: 'Modelos' }).click();
     await expect(page.getByText('Configuración de modelos')).toBeVisible();

@@ -4,6 +4,8 @@ test.describe('Community flows', () => {
   test('documents links, chat interactions, accessibility controls, keyboard combos, and chat widget', async ({ page, context }) => {
     const docsHealth = await page.request.get('/api/v1/documents/overview');
     test.skip(!docsHealth.ok(), 'Requires running gateway/docs backend for full community flow e2e');
+    const docsOverview = await docsHealth.json().catch(() => null) as { unique_sources?: number } | null;
+    test.skip((docsOverview?.unique_sources ?? 0) < 1, 'Requires at least one indexed source for document link verification');
 
     await page.goto('/documents');
     await expect(page.getByRole('heading', { name: /Documents|Documentos/i })).toBeVisible();
