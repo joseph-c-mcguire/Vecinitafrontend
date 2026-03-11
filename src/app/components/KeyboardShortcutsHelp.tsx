@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { useLanguage } from '@/app/context/LanguageContext';
 import { X } from 'lucide-react';
 
@@ -16,6 +16,14 @@ interface KeyboardShortcutsHelpProps {
  */
 export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
   const { language } = useLanguage();
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
 
   const shortcuts: Shortcut[] = [
     {

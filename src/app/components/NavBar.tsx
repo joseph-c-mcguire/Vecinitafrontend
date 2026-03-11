@@ -76,7 +76,7 @@ export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps) {
             </button>
           ) : (
             <Link
-              to="/login?redirect=/admin"
+              to="/login?redirect=%2Fadmin"
               className="px-3 py-1.5 text-xs rounded-md border hover:bg-accent transition-colors"
             >
               Admin login

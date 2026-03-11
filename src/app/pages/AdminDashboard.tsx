@@ -911,7 +911,7 @@ export default function AdminDashboard() {
   // Redirect to home if not admin
   useEffect(() => {
     if (user !== undefined && !isAdmin) {
-      navigate('/login?redirect=/admin', { replace: true });
+      navigate('/login?redirect=%2Fadmin', { replace: true });
     }
   }, [user, isAdmin, navigate]);
 
