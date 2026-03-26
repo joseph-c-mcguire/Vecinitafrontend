@@ -50,14 +50,20 @@ describe('LoginPage integration', () => {
     expect(screen.getByRole('heading', { name: 'Admin Login' })).toBeInTheDocument();
     expect(screen.getByLabelText('Email')).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Browse documents/i })).toHaveAttribute('href', '/documents');
+    expect(screen.getByRole('link', { name: /Browse documents/i })).toHaveAttribute(
+      'href',
+      '/documents'
+    );
   });
 
   it('submits credentials and calls signIn', async () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={['/login?redirect=/admin']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter
+        initialEntries={['/login?redirect=/admin']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <LoginPage />
       </MemoryRouter>
     );
@@ -105,7 +111,10 @@ describe('LoginPage integration', () => {
     authState.isAdmin = true;
 
     render(
-      <MemoryRouter initialEntries={['/login?redirect=/admin']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <MemoryRouter
+        initialEntries={['/login?redirect=/admin']}
+        future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+      >
         <LoginPage />
       </MemoryRouter>
     );

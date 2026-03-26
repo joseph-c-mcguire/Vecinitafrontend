@@ -1,21 +1,29 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Community flows', () => {
-  test('documents links, chat interactions, accessibility controls, keyboard combos, and chat widget', async ({ page, context }) => {
+  test('documents links, chat interactions, accessibility controls, keyboard combos, and chat widget', async ({
+    page,
+    context,
+  }) => {
     const docsHealth = await page.request.get('/api/v1/documents/overview');
-    test.skip(!docsHealth.ok(), 'Requires running gateway/docs backend for full community flow e2e');
-    const docsOverview = await docsHealth.json().catch(() => null) as { unique_sources?: number } | null;
-    test.skip((docsOverview?.unique_sources ?? 0) < 1, 'Requires at least one indexed source for document link verification');
+    test.skip(
+      !docsHealth.ok(),
+      'Requires running gateway/docs backend for full community flow e2e'
+    );
+    const docsOverview = (await docsHealth.json().catch(() => null)) as {
+      unique_sources?: number;
+    } | null;
+    test.skip(
+      (docsOverview?.unique_sources ?? 0) < 1,
+      'Requires at least one indexed source for document link verification'
+    );
 
     await page.goto('/documents');
     await expect(page.getByRole('heading', { name: /Documents|Documentos/i })).toBeVisible();
 
     const sourceLinks = page.locator('table tbody a[href^="http"]');
     await expect(sourceLinks.first()).toBeVisible();
-    const [popup] = await Promise.all([
-      context.waitForEvent('page'),
-      sourceLinks.first().click(),
-    ]);
+    const [popup] = await Promise.all([context.waitForEvent('page'), sourceLinks.first().click()]);
     await expect(popup).toHaveURL(/https?:\/\//);
     await popup.close();
 
@@ -48,7 +56,9 @@ test.describe('Community flows', () => {
     await expect(page.getByRole('dialog')).toBeHidden();
 
     await page.keyboard.press('Alt+k');
-    await expect(page.getByRole('heading', { name: /Keyboard Shortcuts|Atajos de Teclado/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /Keyboard Shortcuts|Atajos de Teclado/i })
+    ).toBeVisible();
     await page.keyboard.press('Escape');
 
     const widgetOpenButton = page.locator('button.fixed[aria-label]').first();
@@ -56,7 +66,10 @@ test.describe('Community flows', () => {
 
     const widgetComposer = page.locator('textarea').last();
     await widgetComposer.fill('Widget test message');
-    await page.getByRole('button', { name: /Send message|Enviar mensaje/i }).last().click();
+    await page
+      .getByRole('button', { name: /Send message|Enviar mensaje/i })
+      .last()
+      .click();
     await expect(page.getByText('Widget test message')).toBeVisible();
 
     await page.getByRole('link', { name: /Admin login/i }).click();

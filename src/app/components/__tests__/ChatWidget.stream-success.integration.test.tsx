@@ -102,7 +102,9 @@ describe('ChatWidget stream success integration', () => {
     expect(agentService.askStream).toHaveBeenCalledTimes(1);
     expect(agentService.ask).not.toHaveBeenCalled();
 
-    expect(screen.queryByText('I could not generate a response right now. Please try again.')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('I could not generate a response right now. Please try again.')
+    ).not.toBeInTheDocument();
     expect(screen.queryByText('THIS SHOULD NOT BE USED')).not.toBeInTheDocument();
   });
 });

@@ -1,12 +1,12 @@
 /**
  * Tests for agentService.ts
- * 
+ *
  * Tests agent API client functionality including requests, streaming, and error handling.
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { agentService, AgentServiceClient, AgentServiceError } from '../agentService';
-import type { AskQueryParams, AgentResponse, AgentConfig } from '../../types/agent';
+import type { AskQueryParams, AgentResponse, AgentConfig, StreamEvent } from '../../types/agent';
 
 // Mock fetch
 globalThis.fetch = vi.fn();
@@ -16,15 +16,44 @@ class MockEventSource {
   onmessage: ((event: MessageEvent) => void) | null = null;
   onerror: ((event: Event) => void) | null = null;
   url: string;
-  
+
   constructor(url: string) {
     this.url = url;
   }
-  
+
   close() {}
 }
 
-globalThis.EventSource = MockEventSource as any;
+globalThis.EventSource = MockEventSource as unknown as typeof EventSource;
+
+const fetchMock = vi.mocked(globalThis.fetch);
+
+function createMessageEvent(data: string): MessageEvent<string> {
+  return new MessageEvent('message', { data });
+}
+
+function installMockEventSource() {
+  class TestEventSource {
+    static latestInstance: TestEventSource | null = null;
+
+    onmessage: ((event: MessageEvent) => void) | null = null;
+    onerror: ((event: Event) => void) | null = null;
+    url: string;
+    closed = false;
+
+    constructor(url: string) {
+      this.url = url;
+      TestEventSource.latestInstance = this;
+    }
+
+    close() {
+      this.closed = true;
+    }
+  }
+
+  globalThis.EventSource = TestEventSource as unknown as typeof EventSource;
+  return TestEventSource;
+}
 
 describe('AgentServiceClient', () => {
   let client: AgentServiceClient;
@@ -82,7 +111,7 @@ describe('AgentServiceClient', () => {
 
       await client.ask(params);
 
-      const callUrl = (fetch as any).mock.calls[0][0];
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       // URLSearchParams encodes spaces as + or %20, both are valid
       expect(callUrl).toContain('question=Test');
       expect(callUrl).toContain('thread_id=thread-123');
@@ -102,7 +131,7 @@ describe('AgentServiceClient', () => {
 
       await relativeClient.ask({ question: 'hello' });
 
-      const callUrl = String((fetch as any).mock.calls[0][0]);
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       expect(callUrl).toContain('/api/ask');
       expect(callUrl).toContain('question=hello');
     });
@@ -117,18 +146,16 @@ describe('AgentServiceClient', () => {
 
       await absoluteClient.ask({ question: 'hello' });
 
-      const callUrl = String((fetch as any).mock.calls[0][0]);
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       expect(callUrl).toContain('http://localhost:8004/api/v1/ask');
       expect(callUrl).toContain('question=hello');
     });
 
     it('should rewrite localhost API base to public host in browser context', async () => {
-      const locationSpy = vi
-        .spyOn(window, 'location', 'get')
-        .mockReturnValue({
-          hostname: '34.55.88.67',
-          origin: 'http://34.55.88.67:15173',
-        } as Location);
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: '34.55.88.67',
+        origin: 'http://34.55.88.67:15173',
+      } as Location);
 
       const publicClient = new AgentServiceClient('http://localhost:18004/api/v1');
 
@@ -139,7 +166,7 @@ describe('AgentServiceClient', () => {
 
       await publicClient.ask({ question: 'hello' });
 
-      const callUrl = String((fetch as any).mock.calls[0][0]);
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       expect(callUrl).toContain('http://34.55.88.67:18004/api/v1/ask');
       expect(callUrl).toContain('question=hello');
 
@@ -147,12 +174,10 @@ describe('AgentServiceClient', () => {
     });
 
     it('should keep localhost API base when browser host is localhost', async () => {
-      const locationSpy = vi
-        .spyOn(window, 'location', 'get')
-        .mockReturnValue({
-          hostname: 'localhost',
-          origin: 'http://localhost:15173',
-        } as Location);
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'localhost',
+        origin: 'http://localhost:15173',
+      } as Location);
 
       const localClient = new AgentServiceClient('http://localhost:18004/api/v1');
 
@@ -163,7 +188,7 @@ describe('AgentServiceClient', () => {
 
       await localClient.ask({ question: 'hello' });
 
-      const callUrl = String((fetch as any).mock.calls[0][0]);
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       expect(callUrl).toContain('http://localhost:18004/api/v1/ask');
       expect(callUrl).toContain('question=hello');
 
@@ -171,12 +196,10 @@ describe('AgentServiceClient', () => {
     });
 
     it('should rewrite stale public gateway host to current browser host', async () => {
-      const locationSpy = vi
-        .spyOn(window, 'location', 'get')
-        .mockReturnValue({
-          hostname: '34.170.200.11',
-          origin: 'http://34.170.200.11:15173',
-        } as Location);
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: '34.170.200.11',
+        origin: 'http://34.170.200.11:15173',
+      } as Location);
 
       const staleHostClient = new AgentServiceClient('http://34.55.88.67:18004/api/v1');
 
@@ -187,7 +210,7 @@ describe('AgentServiceClient', () => {
 
       await staleHostClient.ask({ question: 'hello' });
 
-      const callUrl = String((fetch as any).mock.calls[0][0]);
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
       expect(callUrl).toContain('http://34.170.200.11:18004/api/v1/ask');
       expect(callUrl).toContain('question=hello');
 
@@ -201,16 +224,14 @@ describe('AgentServiceClient', () => {
         text: async () => 'Server error',
       } as Response);
 
-      await expect(
-        client.ask({ question: 'test' })
-      ).rejects.toThrow(AgentServiceError);
+      await expect(client.ask({ question: 'test' })).rejects.toThrow(AgentServiceError);
     });
 
     it('should handle timeout', async () => {
       // Create proper AbortError with correct name
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
-      
+
       vi.mocked(fetch).mockRejectedValueOnce(abortError);
 
       try {
@@ -229,41 +250,27 @@ describe('AgentServiceClient', () => {
     it('should handle network error', async () => {
       vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Network error'));
 
-      await expect(
-        client.ask({ question: 'test' })
-      ).rejects.toThrow(AgentServiceError);
+      await expect(client.ask({ question: 'test' })).rejects.toThrow(AgentServiceError);
     });
   });
 
   describe('askStream', () => {
     it('should handle streaming events', async () => {
-      let savedEventSource: any = null;
-      
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-        
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-        
-        close() {}
-      };
+      const MockES = installMockEventSource();
 
-      const events: any[] = [];
-      
-      const streamPromise = client.askStream(
-        { question: 'test' },
-        (event) => events.push(event)
-      );
+      const events: StreamEvent[] = [];
+
+      const streamPromise = client.askStream({ question: 'test' }, (event) => events.push(event));
 
       // Simulate EventSource events
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
-          savedEventSource.onmessage({ data: '{"type":"thinking","message":"Searching..."}' });
-          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        if (MockES.latestInstance?.onmessage) {
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"thinking","message":"Searching..."}')
+          );
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"complete","answer":"Done","sources":[]}')
+          );
         }
       }, 10);
 
@@ -273,97 +280,59 @@ describe('AgentServiceClient', () => {
     });
 
     it('should build stream URL from relative proxy base URL', async () => {
-      let savedEventSource: any = null;
-
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-
-        close() {}
-      };
+      const MockES = installMockEventSource();
 
       const relativeClient = new AgentServiceClient('/api');
 
       const streamPromise = relativeClient.askStream({ question: 'test' }, () => {});
 
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
-          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        if (MockES.latestInstance?.onmessage) {
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"complete","answer":"Done","sources":[]}')
+          );
         }
       }, 10);
 
       await streamPromise;
-      expect(savedEventSource.url).toContain('/api/ask/stream');
-      expect(savedEventSource.url).not.toContain('/ask/question');
+      expect(MockES.latestInstance?.url).toContain('/api/ask/stream');
+      expect(MockES.latestInstance?.url).not.toContain('/ask/question');
     });
 
     it('should normalize stream URL when absolute base has no API prefix', async () => {
-      let savedEventSource: any = null;
-
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-
-        close() {}
-      };
+      const MockES = installMockEventSource();
 
       const absoluteClient = new AgentServiceClient('http://localhost:8004');
       const streamPromise = absoluteClient.askStream({ question: 'test' }, () => {});
 
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
-          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        if (MockES.latestInstance?.onmessage) {
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"complete","answer":"Done","sources":[]}')
+          );
         }
       }, 10);
 
       await streamPromise;
-      expect(savedEventSource.url).toContain('http://localhost:8004/api/v1/ask/stream');
+      expect(MockES.latestInstance?.url).toContain('http://localhost:8004/api/v1/ask/stream');
     });
 
     it('should handle malformed SSE data', async () => {
-      let savedEventSource: any = null;
-      const consoleErrorSpy = vi
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-        
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-        
-        close() {}
-      };
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const MockES = installMockEventSource();
 
-      const events: any[] = [];
-      
-      const streamPromise = client.askStream(
-        { question: 'test' },
-        (event) => events.push(event)
-      );
+      const events: StreamEvent[] = [];
+
+      const streamPromise = client.askStream({ question: 'test' }, (event) => events.push(event));
 
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
+        if (MockES.latestInstance?.onmessage) {
           // Invalid JSON should be caught and skipped
-          savedEventSource.onmessage({ data: 'invalid json' });
+          MockES.latestInstance.onmessage(createMessageEvent('invalid json'));
           // Valid event after invalid one
-          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"complete","answer":"Done","sources":[]}')
+          );
         }
       }, 10);
 
@@ -376,29 +345,13 @@ describe('AgentServiceClient', () => {
     });
 
     it('should handle stream error', async () => {
-      let savedEventSource: any = null;
-      
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-        
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-        
-        close() {}
-      };
+      const MockES = installMockEventSource();
 
-      const streamPromise = client.askStream(
-        { question: 'test' },
-        () => {}
-      );
+      const streamPromise = client.askStream({ question: 'test' }, () => {});
 
       setTimeout(() => {
-        if (savedEventSource?.onerror) {
-          savedEventSource.onerror(new Event('error'));
+        if (MockES.latestInstance?.onerror) {
+          MockES.latestInstance.onerror(new Event('error'));
         }
       }, 10);
 
@@ -406,31 +359,19 @@ describe('AgentServiceClient', () => {
     });
 
     it('should reject when stream callback throws AgentServiceError', async () => {
-      let savedEventSource: any = null;
+      const MockES = installMockEventSource();
 
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-
-        close() {}
-      };
-
-      const streamPromise = client.askStream(
-        { question: 'test' },
-        () => {
-          throw new AgentServiceError('Connection failed: incomplete chunked read');
-        }
-      );
+      const streamPromise = client.askStream({ question: 'test' }, () => {
+        throw new AgentServiceError('Connection failed: incomplete chunked read');
+      });
 
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
-          savedEventSource.onmessage({ data: '{"type":"error","message":"Connection failed: incomplete chunked read"}' });
+        if (MockES.latestInstance?.onmessage) {
+          MockES.latestInstance.onmessage(
+            createMessageEvent(
+              '{"type":"error","message":"Connection failed: incomplete chunked read"}'
+            )
+          );
         }
       }, 10);
 
@@ -438,56 +379,26 @@ describe('AgentServiceClient', () => {
     });
 
     it('should close stream on complete event', async () => {
-      let savedEventSource: any = null;
-      
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-        closed = false;
-        
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-        
-        close() {
-          this.closed = true;
-        }
-      };
+      const MockES = installMockEventSource();
 
-      const streamPromise = client.askStream(
-        { question: 'test' },
-        () => {}
-      );
+      const streamPromise = client.askStream({ question: 'test' }, () => {});
 
       setTimeout(() => {
-        if (savedEventSource?.onmessage) {
-          savedEventSource.onmessage({ data: '{"type":"complete","answer":"Done","sources":[]}' });
+        if (MockES.latestInstance?.onmessage) {
+          MockES.latestInstance.onmessage(
+            createMessageEvent('{"type":"complete","answer":"Done","sources":[]}')
+          );
         }
       }, 10);
 
       await streamPromise;
 
-      expect(savedEventSource.closed).toBe(true);
+      expect(MockES.latestInstance?.closed).toBe(true);
     });
 
     it('should reject when stream stalls before first event', async () => {
       vi.useFakeTimers();
-      let savedEventSource: any = null;
-
-      (globalThis.EventSource as any) = class MockES {
-        onmessage: ((event: MessageEvent) => void) | null = null;
-        onerror: ((event: Event) => void) | null = null;
-        url: string;
-
-        constructor(url: string) {
-          this.url = url;
-          savedEventSource = this;
-        }
-
-        close() {}
-      };
+      const MockES = installMockEventSource();
 
       try {
         const streamPromise = client.askStream({ question: 'test' }, () => {});
@@ -497,7 +408,7 @@ describe('AgentServiceClient', () => {
 
         const error = await capturedErrorPromise;
         expect(error).toMatchObject({ code: 'STREAM_STALLED' });
-        expect(savedEventSource).toBeTruthy();
+        expect(MockES.latestInstance).toBeTruthy();
       } finally {
         vi.useRealTimers();
       }
@@ -507,9 +418,7 @@ describe('AgentServiceClient', () => {
   describe('getConfig', () => {
     it('should fetch configuration', async () => {
       const mockConfig: AgentConfig = {
-        providers: [
-          { name: 'groq', models: ['llama-3.1'], default: true },
-        ],
+        providers: [{ name: 'groq', models: ['llama-3.1'], default: true }],
         models: { groq: ['llama-3.1'] },
       };
 
@@ -573,20 +482,20 @@ describe('AgentServiceClient', () => {
 describe('AgentServiceError', () => {
   it('should create error with message', () => {
     const error = new AgentServiceError('Test error');
-    
+
     expect(error.message).toBe('Test error');
     expect(error.name).toBe('AgentServiceError');
   });
 
   it('should include status code', () => {
     const error = new AgentServiceError('Test error', 404);
-    
+
     expect(error.statusCode).toBe(404);
   });
 
   it('should include error code', () => {
     const error = new AgentServiceError('Test error', 500, 'INTERNAL_ERROR');
-    
+
     expect(error.code).toBe('INTERNAL_ERROR');
   });
 });

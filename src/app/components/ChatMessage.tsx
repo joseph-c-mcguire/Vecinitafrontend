@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -10,6 +10,7 @@ import type { Message as ConversationMessage } from '../hooks/useConversationSto
 import { Card } from './ui/card';
 import { Separator } from './ui/separator';
 import { cn } from './ui/utils';
+export type Message = ConversationMessage;
 
 interface ChatMessageProps {
   message: ConversationMessage;
@@ -23,11 +24,20 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
   const isToolSummary = !isUser && message.content.startsWith('Tool Summary');
 
   // Automatically read message when screen reader is enabled and it's an assistant message
-  React.useEffect(() => {
+  useEffect(() => {
     if (settings.screenReader && !isUser) {
       speak(message.content);
     }
-  }, [message.id, settings.screenReader]);
+  }, [isUser, message.content, settings.screenReader, speak]);
+
+  const initialFeedback = message.feedback
+    ? {
+        messageId: message.id,
+        rating: message.feedback.rating,
+        comment: message.feedback.comment,
+        timestamp: message.timestamp,
+      }
+    : undefined;
 
   const handleTextClick = () => {
     if (settings.screenReader) {
@@ -63,19 +73,32 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
               {message.content}
             </Card>
           ) : !isUser ? (
-            <div className="text-sm sm:text-base text-foreground break-words" onClick={handleTextClick}>
+            <div
+              className="text-sm sm:text-base text-foreground break-words"
+              onClick={handleTextClick}
+            >
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={{
-                  p: ({ children }) => <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>,
-                  ul: ({ children }) => <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>,
-                  ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>,
+                  p: ({ children }) => (
+                    <p className="mb-2 last:mb-0 whitespace-pre-wrap">{children}</p>
+                  ),
+                  ul: ({ children }) => (
+                    <ul className="list-disc pl-5 mb-2 last:mb-0">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal pl-5 mb-2 last:mb-0">{children}</ol>
+                  ),
                   li: ({ children }) => <li className="mb-1 last:mb-0">{children}</li>,
                   code: ({ children }) => (
-                    <code className="rounded bg-muted px-1 py-0.5 text-xs sm:text-sm">{children}</code>
+                    <code className="rounded bg-muted px-1 py-0.5 text-xs sm:text-sm">
+                      {children}
+                    </code>
                   ),
                   pre: ({ children }) => (
-                    <pre className="mb-2 overflow-x-auto rounded-md border bg-background/60 p-3 text-xs sm:text-sm">{children}</pre>
+                    <pre className="mb-2 overflow-x-auto rounded-md border bg-background/60 p-3 text-xs sm:text-sm">
+                      {children}
+                    </pre>
                   ),
                   a: ({ href, children }) => (
                     <a
@@ -117,7 +140,7 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
         {!isUser && onFeedbackSubmit && (
           <MessageFeedback
             messageId={message.id}
-            initialFeedback={message.feedback}
+            initialFeedback={initialFeedback}
             onFeedbackSubmit={onFeedbackSubmit}
           />
         )}

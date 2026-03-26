@@ -11,6 +11,6 @@ export { SkipToContent } from './SkipToContent';
 export { StreamingIndicator, TypingIndicator } from './StreamingIndicator';
 
 // Export types
-export type { Message } from './ChatMessage';
+export type { Message } from '../hooks/useConversationStorage';
 export type { Source } from './SourceCard';
 export type { Feedback } from './MessageFeedback';

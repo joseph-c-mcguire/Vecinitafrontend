@@ -63,7 +63,14 @@ describe('AdminDashboard integration', () => {
       ],
       total: 1,
     });
-    mockAddSource.mockResolvedValue({ status: 'completed', url: 'https://example.com', depth: 1, tags: ['housing'], chunks_inserted: 3, chunks_total: 3 });
+    mockAddSource.mockResolvedValue({
+      status: 'completed',
+      url: 'https://example.com',
+      depth: 1,
+      tags: ['housing'],
+      chunks_inserted: 3,
+      chunks_total: 3,
+    });
     mockAddSourcesBatch.mockResolvedValue({
       status: 'partial',
       submitted: 2,
@@ -77,7 +84,12 @@ describe('AdminDashboard integration', () => {
         { url: 'https://example.com/new-2', status: 'failed', error: 'HTTP 500' },
       ],
     });
-    mockUpdateSourceTags.mockResolvedValue({ status: 'updated', url: 'https://example.com', tags: ['housing', 'food'], chunks_updated: 2 });
+    mockUpdateSourceTags.mockResolvedValue({
+      status: 'updated',
+      url: 'https://example.com',
+      tags: ['housing', 'food'],
+      chunks_updated: 2,
+    });
     mockGetModelConfig.mockResolvedValue({
       generation: {
         current: { provider: 'groq', model: 'llama-3.1' },
@@ -109,8 +121,14 @@ describe('AdminDashboard integration', () => {
 
     await waitFor(() => expect(mockGetSources).toHaveBeenCalled());
 
-    await user.type(screen.getByPlaceholderText('https://example.com/page'), 'https://example.com/new');
-    await user.type(screen.getAllByPlaceholderText('Tags (comma separated, optional)')[0], 'Housing, Food, food');
+    await user.type(
+      screen.getByPlaceholderText('https://example.com/page'),
+      'https://example.com/new'
+    );
+    await user.type(
+      screen.getAllByPlaceholderText('Tags (comma separated, optional)')[0],
+      'Housing, Food, food'
+    );
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() => {
@@ -141,7 +159,11 @@ describe('AdminDashboard integration', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
-      expect(mockUpdateSourceTags).toHaveBeenCalledWith('https://example.com', ['housing', 'food'], 'en');
+      expect(mockUpdateSourceTags).toHaveBeenCalledWith(
+        'https://example.com',
+        ['housing', 'food'],
+        'en'
+      );
     });
   });
 
@@ -162,7 +184,10 @@ describe('AdminDashboard integration', () => {
       screen.getByPlaceholderText('Paste urls.txt content (one URL per line)'),
       'https://example.com/new-1\nhttps://example.com/new-2'
     );
-    await user.type(screen.getAllByPlaceholderText('Tags (comma separated, optional)')[1], 'Housing, food');
+    await user.type(
+      screen.getAllByPlaceholderText('Tags (comma separated, optional)')[1],
+      'Housing, food'
+    );
     await user.click(screen.getByRole('button', { name: 'Batch ingest' }));
 
     await waitFor(() => {
@@ -200,7 +225,10 @@ describe('AdminDashboard integration', () => {
     const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(['housing resources'], 'guide.txt', { type: 'text/plain' });
     await user.upload(fileInput, file);
-    await user.type(screen.getByPlaceholderText('Tags (comma separated, optional)'), 'housing,benefits');
+    await user.type(
+      screen.getByPlaceholderText('Tags (comma separated, optional)'),
+      'housing,benefits'
+    );
 
     await user.click(screen.getByRole('button', { name: 'Upload & Embed' }));
 
@@ -229,8 +257,14 @@ describe('AdminDashboard integration', () => {
     expect(screen.getByText('Subir')).toBeInTheDocument();
     expect(screen.getByText('Cola')).toBeInTheDocument();
     expect(screen.getByText('Modelos')).toBeInTheDocument();
-    expect(screen.getAllByPlaceholderText('Etiquetas (separadas por comas, opcional)').length).toBeGreaterThan(0);
-    expect(screen.getByText('Autocompletado con etiquetas existentes. Puedes agregar etiquetas personalizadas.')).toBeInTheDocument();
+    expect(
+      screen.getAllByPlaceholderText('Etiquetas (separadas por comas, opcional)').length
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByText(
+        'Autocompletado con etiquetas existentes. Puedes agregar etiquetas personalizadas.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('switches to Queue and Models tabs in Spanish with localized labels', async () => {
@@ -257,6 +291,8 @@ describe('AdminDashboard integration', () => {
     expect(screen.getByText('Configuración de modelos')).toBeInTheDocument();
     expect(screen.getByText('Modelo de generación')).toBeInTheDocument();
     expect(screen.getByText('Modelo de embeddings')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Guardar configuración de modelos' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Guardar configuración de modelos' })
+    ).toBeInTheDocument();
   });
 });

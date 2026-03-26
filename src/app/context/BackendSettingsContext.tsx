@@ -22,7 +22,9 @@ export interface BackendSettingsContextType {
   refetchConfig: () => Promise<void>;
 }
 
-export const BackendSettingsContext = createContext<BackendSettingsContextType | undefined>(undefined);
+export const BackendSettingsContext = createContext<BackendSettingsContextType | undefined>(
+  undefined
+);
 
 export function BackendSettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<BackendSettings>(() => {
@@ -40,7 +42,12 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
       try {
         const parsed = JSON.parse(saved);
         // Validate that the parsed data has the required fields
-        if (parsed.llmProvider && parsed.llmModel && parsed.embeddingProvider && parsed.embeddingModel) {
+        if (
+          parsed.llmProvider &&
+          parsed.llmModel &&
+          parsed.embeddingProvider &&
+          parsed.embeddingModel
+        ) {
           return parsed;
         }
         // If invalid, return defaults
@@ -64,27 +71,31 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
         setError(null);
         const data = await agentService.getConfig();
         setConfig(data);
-        
+
         // Check if saved settings are valid for current config
         if (data.providers && data.providers.length > 0) {
-          const providerExists = data.providers.some(p => p.name === settings.llmProvider);
-          if (!providerExists) {
-            // Reset to default provider from config
-            const defaultProvider = data.providers.find(p => p.default) || data.providers[0];
-            setSettings(prev => ({
-              ...prev,
-              llmProvider: defaultProvider.name,
-              llmModel: defaultProvider.models[0] || '',
-            }));
-          } else {
-            const providerModels = data.models?.[settings.llmProvider] ?? [];
-            if (!providerModels.includes(settings.llmModel)) {
-              setSettings(prev => ({
+          setSettings((prev) => {
+            const providerExists = data.providers.some((provider) => provider.name === prev.llmProvider);
+
+            if (!providerExists) {
+              const defaultProvider = data.providers.find((provider) => provider.default) || data.providers[0];
+              return {
+                ...prev,
+                llmProvider: defaultProvider.name,
+                llmModel: defaultProvider.models[0] || '',
+              };
+            }
+
+            const providerModels = data.models?.[prev.llmProvider] ?? [];
+            if (!providerModels.includes(prev.llmModel)) {
+              return {
                 ...prev,
                 llmModel: providerModels[0] || '',
-              }));
+              };
             }
-          }
+
+            return prev;
+          });
         }
       } catch (err) {
         console.error('Failed to fetch agent config:', err);
@@ -95,7 +106,7 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
       }
     };
 
-    fetchConfig();
+    void fetchConfig();
   }, []);
 
   // Save settings to localStorage
@@ -128,7 +139,7 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
       const data = await agentService.getConfig();
       setConfig(data);
       setError(null);
-    } catch (err) {
+    } catch {
       setError('Failed to fetch backend configuration');
     } finally {
       setIsLoading(false);
@@ -142,18 +153,18 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <BackendSettingsContext.Provider 
-      value={{ 
-        settings, 
-        config, 
-        isLoading, 
-        error, 
+    <BackendSettingsContext.Provider
+      value={{
+        settings,
+        config,
+        isLoading,
+        error,
         selectedLLM,
-        setLLMProvider, 
-        setLLMModel, 
-        setEmbeddingProvider, 
-        setEmbeddingModel, 
-        refetchConfig 
+        setLLMProvider,
+        setLLMModel,
+        setEmbeddingProvider,
+        setEmbeddingModel,
+        refetchConfig,
       }}
     >
       {children}

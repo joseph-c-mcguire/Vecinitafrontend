@@ -1,6 +1,6 @@
 /**
  * Tests for agent types and type guards
- * 
+ *
  * Tests TypeScript type definitions and type guard functions.
  */
 

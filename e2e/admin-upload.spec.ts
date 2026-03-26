@@ -4,12 +4,20 @@ import { Buffer } from 'node:buffer';
 
 const adminEmail = process.env.E2E_ADMIN_EMAIL || process.env.VITE_DEV_ADMIN_EMAIL;
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || process.env.VITE_DEV_ADMIN_PASSWORD;
-const adminToken = process.env.E2E_ADMIN_TOKEN || process.env.VITE_DEV_ADMIN_TOKEN || process.env.DEV_ADMIN_BEARER_TOKEN;
+const adminToken =
+  process.env.E2E_ADMIN_TOKEN ||
+  process.env.VITE_DEV_ADMIN_TOKEN ||
+  process.env.DEV_ADMIN_BEARER_TOKEN;
 
 test.describe('Admin authentication and ingestion', () => {
-  test.skip(!adminEmail || !adminPassword, 'Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD (or VITE_DEV_ADMIN_*) for admin E2E tests.');
+  test.skip(
+    !adminEmail || !adminPassword,
+    'Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD (or VITE_DEV_ADMIN_*) for admin E2E tests.'
+  );
 
-  test('logs in, adds source with tags, uploads by click and drag-drop, and logs out', async ({ page }) => {
+  test('logs in, adds source with tags, uploads by click and drag-drop, and logs out', async ({
+    page,
+  }) => {
     const cleanupSourceUrls = new Set<string>();
     const maybeSkipForInfraConstraint = async () => {
       const adminError = page.getByText(/Admin API error/i).first();
@@ -54,32 +62,44 @@ test.describe('Admin authentication and ingestion', () => {
     await tagsComboboxes.last().fill('__e2e__,community');
     await page.getByRole('button', { name: /Upload & Embed|Subir y vectorizar/i }).click();
     await maybeSkipForInfraConstraint();
-    await expect(page.getByText(/Uploaded:\s*\d+ chunks inserted\.|Subido:\s*\d+ fragmentos insertados\./i)).toBeVisible();
+    await expect(
+      page.getByText(/Uploaded:\s*\d+ chunks inserted\.|Subido:\s*\d+ fragmentos insertados\./i)
+    ).toBeVisible();
 
     await page.getByRole('button', { name: /Sources|Fuentes/i }).click();
     await expect(page.locator('span', { hasText: clickUploadFilename }).first()).toBeVisible();
 
     await page.getByRole('button', { name: /Upload|Subir/i }).click();
 
-    const dropZone = page.getByText(/Drop a file here or click to select|Suelta un archivo aqui o haz clic para seleccionar/i).locator('..');
+    const dropZone = page
+      .getByText(
+        /Drop a file here or click to select|Suelta un archivo aqui o haz clic para seleccionar/i
+      )
+      .locator('..');
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
     const dragUploadFilename = `community-resource-drag-${Date.now()}.txt`;
     await page.evaluate(
       ({ dt, name }) => {
-        const file = new File(['Community resource drag-and-drop upload for automated verification.'], name, { type: 'text/plain' });
+        const file = new File(
+          ['Community resource drag-and-drop upload for automated verification.'],
+          name,
+          { type: 'text/plain' }
+        );
         (dt as DataTransfer).items.add(file);
       },
-      { dt: dataTransfer, name: dragUploadFilename },
+      { dt: dataTransfer, name: dragUploadFilename }
     );
 
     await dropZone.dispatchEvent('drop', { dataTransfer });
     await expect(tagsComboboxes.last()).toBeVisible();
     await tagsComboboxes.last().fill('__e2e__,community');
-  await page.getByRole('button', { name: /Upload & Embed|Subir y vectorizar/i }).click();
+    await page.getByRole('button', { name: /Upload & Embed|Subir y vectorizar/i }).click();
     await maybeSkipForInfraConstraint();
-  await expect(page.getByText(/Uploaded:\s*\d+ chunks inserted\.|Subido:\s*\d+ fragmentos insertados\./i)).toBeVisible();
+    await expect(
+      page.getByText(/Uploaded:\s*\d+ chunks inserted\.|Subido:\s*\d+ fragmentos insertados\./i)
+    ).toBeVisible();
 
-  await page.getByRole('button', { name: /Sources|Fuentes/i }).click();
+    await page.getByRole('button', { name: /Sources|Fuentes/i }).click();
     await expect(page.locator('span', { hasText: dragUploadFilename }).first()).toBeVisible();
 
     await page.goto('/documents');
@@ -93,7 +113,9 @@ test.describe('Admin authentication and ingestion', () => {
       });
 
       if (listResponse.ok()) {
-        const payload = (await listResponse.json()) as { sources?: Array<{ url?: string; tags?: string[] }> };
+        const payload = (await listResponse.json()) as {
+          sources?: Array<{ url?: string; tags?: string[] }>;
+        };
         for (const source of payload.sources ?? []) {
           const sourceUrlValue = source.url ?? '';
           const sourceTags = source.tags ?? [];
@@ -114,6 +136,8 @@ test.describe('Admin authentication and ingestion', () => {
     }
 
     await page.getByRole('button', { name: /Sign out|Cerrar sesión/i }).click();
-    await expect(page.getByRole('link', { name: /Admin login|Iniciar sesión de administrador/i })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Admin login|Iniciar sesión de administrador/i })
+    ).toBeVisible();
   });
 });

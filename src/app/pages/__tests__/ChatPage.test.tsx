@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 
 import ChatPage from '../ChatPage';
 import { useAgentChat } from '../../hooks/useAgentChat';
+import { AgentServiceError } from '../../services/agentService';
+
+type UseAgentChatState = ReturnType<typeof useAgentChat>;
 
 vi.mock('../../context/LanguageContext', () => ({
   useLanguage: () => ({
@@ -55,8 +58,11 @@ describe('ChatPage', () => {
   const mockSendMessage = vi.fn();
   const mockClearThread = vi.fn();
   const mockRetryLastMessage = vi.fn();
+  const mockLoadThread = vi.fn();
+  const mockStartNewConversation = vi.fn();
 
-  const defaultHookState = {
+  const createHookState = (overrides: Partial<UseAgentChatState> = {}): UseAgentChatState => ({
+    threadId: 'thread-123',
     messages: [],
     isLoading: false,
     streamingMessage: null,
@@ -65,14 +71,19 @@ describe('ChatPage', () => {
     pendingClarification: null,
     error: null,
     sendMessage: mockSendMessage,
+    loadThread: mockLoadThread,
     clearThread: mockClearThread,
+    startNewConversation: mockStartNewConversation,
     retryLastMessage: mockRetryLastMessage,
-  };
+    getAllThreadIds: () => [],
+    getTimeRemaining: () => null,
+    ...overrides,
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
     Element.prototype.scrollIntoView = vi.fn();
-    vi.mocked(useAgentChat).mockReturnValue(defaultHookState);
+    vi.mocked(useAgentChat).mockReturnValue(createHookState());
     mockSendMessage.mockResolvedValue(undefined);
   });
 
@@ -125,7 +136,7 @@ describe('ChatPage', () => {
   it('does not submit empty messages and disables submit while loading', async () => {
     const user = userEvent.setup();
     vi.mocked(useAgentChat).mockReturnValue({
-      ...defaultHookState,
+      ...createHookState(),
       isLoading: true,
     });
 
@@ -151,8 +162,9 @@ describe('ChatPage', () => {
 
   it('renders clarification prompt and questions when pending clarification exists', () => {
     vi.mocked(useAgentChat).mockReturnValue({
-      ...defaultHookState,
+      ...createHookState(),
       pendingClarification: {
+        originalQuestion: 'Please clarify your neighborhood',
         prompt: 'Please clarify your neighborhood',
         questions: ['What city are you in?', 'Do you need immediate help?'],
       },
@@ -161,7 +173,9 @@ describe('ChatPage', () => {
     render(<ChatPage />);
 
     expect(
-      screen.getByText((text) => text === 'Action required' || text === 'clarificationActionRequired')
+      screen.getByText(
+        (text) => text === 'Action required' || text === 'clarificationActionRequired'
+      )
     ).toBeInTheDocument();
     expect(screen.getByText('Please clarify your neighborhood')).toBeInTheDocument();
     expect(screen.getByText('1. What city are you in?')).toBeInTheDocument();
@@ -170,7 +184,7 @@ describe('ChatPage', () => {
 
   it('renders latest backend progress hint while loading', () => {
     vi.mocked(useAgentChat).mockReturnValue({
-      ...defaultHookState,
+      ...createHookState(),
       isLoading: true,
       progressMessages: ['Searching', 'Scoring documents'],
       streamProgress: { stage: 'Retrieval', percent: 40, waiting: true, status: 'working' },
@@ -188,11 +202,8 @@ describe('ChatPage', () => {
   it('renders error and retries last message when clicking Retry', async () => {
     const user = userEvent.setup();
     vi.mocked(useAgentChat).mockReturnValue({
-      ...defaultHookState,
-      error: {
-        message: 'Request failed',
-        code: 'NETWORK_ERROR',
-      },
+      ...createHookState(),
+      error: new AgentServiceError('Request failed', undefined, 'NETWORK_ERROR'),
     });
 
     render(<ChatPage />);

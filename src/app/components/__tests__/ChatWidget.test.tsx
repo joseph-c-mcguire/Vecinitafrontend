@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ChatWidget } from '../ChatWidget';
 import { LanguageProvider } from '../../context/LanguageContext';
@@ -14,6 +14,8 @@ import { BackendSettingsProvider } from '../../context/BackendSettingsContext';
 import * as useAgentChatModule from '../../hooks/useAgentChat';
 import * as agentServiceModule from '../../services/agentService';
 import type { Message } from '../ChatMessage';
+
+type UseAgentChatState = ReturnType<typeof useAgentChatModule.useAgentChat>;
 
 // Mock hooks and services
 vi.mock('../../hooks/useAgentChat');
@@ -49,9 +51,7 @@ function TestWrapper({ children }: { children: React.ReactNode }) {
   return (
     <LanguageProvider>
       <AccessibilityProvider>
-        <BackendSettingsProvider>
-          {children}
-        </BackendSettingsProvider>
+        <BackendSettingsProvider>{children}</BackendSettingsProvider>
       </AccessibilityProvider>
     </LanguageProvider>
   );
@@ -61,16 +61,29 @@ describe('ChatWidget', () => {
   const mockSendMessage = vi.fn();
   const mockClearThread = vi.fn();
   const mockRetryLastMessage = vi.fn();
+  const mockLoadThread = vi.fn();
+  const mockStartNewConversation = vi.fn();
 
-  const defaultUseAgentChatReturn = {
+  const createUseAgentChatReturn = (
+    overrides: Partial<UseAgentChatState> = {}
+  ): UseAgentChatState => ({
+    threadId: 'thread-123',
     messages: [] as Message[],
     isLoading: false,
     streamingMessage: null,
     error: null,
+    progressMessages: [],
+    streamProgress: { stage: 'Working', percent: 0, waiting: false, status: 'working' },
+    pendingClarification: null,
     sendMessage: mockSendMessage,
+    loadThread: mockLoadThread,
     clearThread: mockClearThread,
+    startNewConversation: mockStartNewConversation,
     retryLastMessage: mockRetryLastMessage,
-  };
+    getAllThreadIds: () => [],
+    getTimeRemaining: () => null,
+    ...overrides,
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,16 +91,14 @@ describe('ChatWidget', () => {
 
     // Mock agentService.getConfig for BackendSettingsContext
     vi.mocked(agentServiceModule.agentService.getConfig).mockResolvedValue({
-      providers: [
-        { name: 'groq', models: ['llama-3.1-8b-instant'], default: true },
-      ],
+      providers: [{ name: 'groq', models: ['llama-3.1-8b-instant'], default: true }],
       models: { groq: ['llama-3.1-8b-instant'] },
       defaultProvider: 'groq',
       defaultModel: 'llama-3.1-8b-instant',
     });
 
     // Mock useAgentChat hook
-    vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue(defaultUseAgentChatReturn);
+    vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue(createUseAgentChatReturn());
 
     mockSendMessage.mockResolvedValue(undefined);
   });
@@ -197,7 +208,7 @@ describe('ChatWidget', () => {
       ];
 
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
-        ...defaultUseAgentChatReturn,
+        ...createUseAgentChatReturn(),
         messages,
       });
 
@@ -215,16 +226,16 @@ describe('ChatWidget', () => {
 
     it('should display streaming indicator when loading', async () => {
       // Re-mock useAgentChat to return streaming state
-      const streamingMock = {
-        messages: [] as Message[],
+      const streamingMock = createUseAgentChatReturn({
         isLoading: true,
         streamingMessage: 'Thinking about your question...',
-        error: null,
         sendMessage: vi.fn(),
         clearThread: vi.fn(),
         retryLastMessage: vi.fn(),
-      };
-      
+        loadThread: vi.fn(),
+        startNewConversation: vi.fn(),
+      });
+
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue(streamingMock);
 
       render(
@@ -240,15 +251,11 @@ describe('ChatWidget', () => {
       });
     });
 
-    it('should display error message when error occurs', async () => {
-      const error = {
-        message: 'Network error',
-        code: 'NETWORK_ERROR',
-        statusCode: 500,
-      };
+    it('should display an error panel when an error occurs', async () => {
+      const error = new agentServiceModule.AgentServiceError('Network error', 500, 'NETWORK_ERROR');
 
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
-        ...defaultUseAgentChatReturn,
+        ...createUseAgentChatReturn(),
         error,
       });
 
@@ -259,7 +266,8 @@ describe('ChatWidget', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Network error')).toBeInTheDocument();
+        expect(screen.getByText('Error')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
       });
     });
   });
@@ -340,7 +348,7 @@ describe('ChatWidget', () => {
 
       const input = screen.getByRole('textbox') as HTMLTextAreaElement;
       await user.type(input, 'Test question');
-      
+
       const sendButton = screen.getByRole('button', { name: /send/i });
       await user.click(sendButton);
 
@@ -351,7 +359,7 @@ describe('ChatWidget', () => {
 
     it('should disable input when loading', async () => {
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
-        ...defaultUseAgentChatReturn,
+        ...createUseAgentChatReturn(),
         isLoading: true,
       });
 
@@ -389,13 +397,11 @@ describe('ChatWidget', () => {
   describe('error handling', () => {
     it('should display retry button on error', async () => {
       const error = {
-        message: 'Request failed',
-        code: 'REQUEST_FAILED',
-        statusCode: 500,
+        ...new agentServiceModule.AgentServiceError('Request failed', 500, 'REQUEST_FAILED'),
       };
 
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
-        ...defaultUseAgentChatReturn,
+        ...createUseAgentChatReturn(),
         error,
       });
 
@@ -413,13 +419,11 @@ describe('ChatWidget', () => {
     it('should call retryLastMessage when retry is clicked', async () => {
       const user = userEvent.setup();
       const error = {
-        message: 'Request failed',
-        code: 'REQUEST_FAILED',
-        statusCode: 500,
+        ...new agentServiceModule.AgentServiceError('Request failed', 500, 'REQUEST_FAILED'),
       };
 
       vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
-        ...defaultUseAgentChatReturn,
+        ...createUseAgentChatReturn(),
         error,
       });
 

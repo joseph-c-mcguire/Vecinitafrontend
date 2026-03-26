@@ -116,9 +116,7 @@ describe('BackendSettingsContext', () => {
     });
 
     it('should handle config fetch error gracefully', async () => {
-      vi.mocked(agentService.getConfig).mockRejectedValue(
-        new Error('Network error')
-      );
+      vi.mocked(agentService.getConfig).mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useBackendSettings(), {
         wrapper: BackendSettingsProvider,
@@ -202,7 +200,7 @@ describe('BackendSettingsContext', () => {
 
       const saved = localStorage.getItem('vecinita-backend-settings');
       const parsed = JSON.parse(saved!);
-      
+
       expect(parsed.llmProvider).toBe('openai');
     });
   });
@@ -281,9 +279,7 @@ describe('BackendSettingsContext', () => {
     });
 
     it('should clear error on successful refetch', async () => {
-      vi.mocked(agentService.getConfig).mockRejectedValueOnce(
-        new Error('Initial error')
-      );
+      vi.mocked(agentService.getConfig).mockRejectedValueOnce(new Error('Initial error'));
 
       const { result } = renderHook(() => useBackendSettings(), {
         wrapper: BackendSettingsProvider,
@@ -306,9 +302,7 @@ describe('BackendSettingsContext', () => {
 
   describe('error handling', () => {
     it('should set error state on fetch failure', async () => {
-      vi.mocked(agentService.getConfig).mockRejectedValue(
-        new Error('Network error')
-      );
+      vi.mocked(agentService.getConfig).mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useBackendSettings(), {
         wrapper: BackendSettingsProvider,
@@ -330,9 +324,7 @@ describe('BackendSettingsContext', () => {
       };
       localStorage.setItem('vecinita-backend-settings', JSON.stringify(savedSettings));
 
-      vi.mocked(agentService.getConfig).mockRejectedValue(
-        new Error('Network error')
-      );
+      vi.mocked(agentService.getConfig).mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useBackendSettings(), {
         wrapper: BackendSettingsProvider,

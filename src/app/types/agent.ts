@@ -1,6 +1,6 @@
 /**
  * TypeScript interfaces for Backend Agent Integration
- * 
+ *
  * Defines types for agent API responses, streaming events, and configurations.
  */
 

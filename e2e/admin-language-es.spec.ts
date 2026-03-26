@@ -5,7 +5,10 @@ const adminEmail = process.env.E2E_ADMIN_EMAIL || process.env.VITE_DEV_ADMIN_EMA
 const adminPassword = process.env.E2E_ADMIN_PASSWORD || process.env.VITE_DEV_ADMIN_PASSWORD;
 
 test.describe('Admin Spanish language toggle', () => {
-  test.skip(!adminEmail || !adminPassword, 'Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD (or VITE_DEV_ADMIN_*) for admin E2E tests.');
+  test.skip(
+    !adminEmail || !adminPassword,
+    'Set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD (or VITE_DEV_ADMIN_*) for admin E2E tests.'
+  );
 
   test('switches language to Spanish and shows localized admin tab labels', async ({ page }) => {
     await page.addInitScript(() => {
@@ -33,7 +36,9 @@ test.describe('Admin Spanish language toggle', () => {
     await page.getByRole('button', { name: 'Cola' }).click();
     const queueStatusFilter = page.locator('main').getByRole('combobox').first();
     await expect(queueStatusFilter).toBeVisible();
-    await expect(queueStatusFilter.locator('option[value=""]')).toHaveText(/All statuses|Todos los estados/i);
+    await expect(queueStatusFilter.locator('option[value=""]')).toHaveText(
+      /All statuses|Todos los estados/i
+    );
 
     await page.getByRole('button', { name: 'Modelos' }).click();
     await expect(page.getByText('Configuración de modelos')).toBeVisible();

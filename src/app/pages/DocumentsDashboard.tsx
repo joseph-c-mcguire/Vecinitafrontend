@@ -58,6 +58,11 @@ interface TagStat {
   source_count: number;
 }
 
+interface TagStatsResponseRow {
+  tag: string;
+  source_count?: number;
+}
+
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -92,7 +97,12 @@ export default function DocumentsDashboard() {
     ])
       .then(([overviewData, tagsData]) => {
         setOverview(overviewData);
-        setTagStats((tagsData.tags ?? []).map((row: any) => ({ tag: row.tag, source_count: row.source_count ?? 0 })));
+        setTagStats(
+          ((tagsData.tags ?? []) as TagStatsResponseRow[]).map((row) => ({
+            tag: row.tag,
+            source_count: row.source_count ?? 0,
+          }))
+        );
         setLoading(false);
       })
       .catch((e) => {
@@ -105,7 +115,8 @@ export default function DocumentsDashboard() {
     if (!overview) return [];
     return overview.sources.filter((source) => {
       const query = search.trim().toLowerCase();
-      const searchable = `${source.url} ${source.title ?? ''} ${source.source_domain ?? ''}`.toLowerCase();
+      const searchable =
+        `${source.url} ${source.title ?? ''} ${source.source_domain ?? ''}`.toLowerCase();
       if (query && !searchable.includes(query)) {
         return false;
       }
@@ -124,7 +135,9 @@ export default function DocumentsDashboard() {
       return source.download_url;
     }
 
-    const response = await fetch(`${API_BASE}/documents/download-url?source_url=${encodeURIComponent(source.url)}`);
+    const response = await fetch(
+      `${API_BASE}/documents/download-url?source_url=${encodeURIComponent(source.url)}`
+    );
     if (!response.ok) {
       throw new Error(`${t('docsDownloadError')} (HTTP ${response.status})`);
     }
@@ -150,7 +163,9 @@ export default function DocumentsDashboard() {
   };
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]));
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+    );
   };
 
   if (loading) {
@@ -164,7 +179,9 @@ export default function DocumentsDashboard() {
   if (error || !overview) {
     return (
       <main className="flex flex-1 items-center justify-center">
-        <p className="text-destructive">{t('docsLoadFailed')}: {error ?? t('docsUnknownError')}</p>
+        <p className="text-destructive">
+          {t('docsLoadFailed')}: {error ?? t('docsUnknownError')}
+        </p>
       </main>
     );
   }
@@ -265,11 +282,16 @@ export default function DocumentsDashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground truncate max-w-sm mt-0.5 pl-6">{source.url}</p>
+                    <p className="text-xs text-muted-foreground truncate max-w-sm mt-0.5 pl-6">
+                      {source.url}
+                    </p>
                     {(source.tags ?? []).length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2 pl-6">
                         {(source.tags ?? []).slice(0, 6).map((tag) => (
-                          <span key={`${source.url}-${tag}`} className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground">
+                          <span
+                            key={`${source.url}-${tag}`}
+                            className="rounded-full border px-2 py-0.5 text-[10px] text-muted-foreground"
+                          >
                             {tag}
                           </span>
                         ))}
@@ -288,16 +310,17 @@ export default function DocumentsDashboard() {
                           {t('docsOpenSource')}
                         </a>
                       )}
-                      {!source.url.startsWith('http') && (source.downloadable || source.download_url) && (
-                        <button
-                          onClick={() => handleDownload(source)}
-                          disabled={downloadingUrl === source.url}
-                          className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
-                        >
-                          <Download size={12} />
-                          {downloadingUrl === source.url ? '…' : t('docsDownload')}
-                        </button>
-                      )}
+                      {!source.url.startsWith('http') &&
+                        (source.downloadable || source.download_url) && (
+                          <button
+                            onClick={() => handleDownload(source)}
+                            disabled={downloadingUrl === source.url}
+                            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50"
+                          >
+                            <Download size={12} />
+                            {downloadingUrl === source.url ? '…' : t('docsDownload')}
+                          </button>
+                        )}
                     </div>
                   </td>
                 </tr>

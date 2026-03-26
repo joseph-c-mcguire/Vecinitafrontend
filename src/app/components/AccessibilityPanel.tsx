@@ -10,14 +10,14 @@ interface AccessibilityPanelProps {
 
 export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps) {
   const { t } = useLanguage();
-  const { 
-    settings, 
-    setFontSize, 
-    toggleHighContrast, 
+  const {
+    settings,
+    setFontSize,
+    toggleHighContrast,
     toggleReduceMotion,
     toggleDyslexicFont,
     toggleScreenReader,
-    toggleHighlighterMode
+    toggleHighlighterMode,
   } = useAccessibility();
 
   React.useEffect(() => {
@@ -39,11 +39,7 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
   return (
     <>
       {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-black/50 z-40"
-        onClick={onClose}
-        aria-hidden="true"
-      />
+      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} aria-hidden="true" />
 
       {/* Panel */}
       <div
@@ -82,25 +78,22 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                 <select
                   id="font-size-select"
                   value={settings.fontSize}
-                  onChange={(e) => setFontSize(e.target.value as any)}
+                    onChange={(e) =>
+                      setFontSize(
+                        e.target.value as 'small' | 'medium' | 'large' | 'extra-large'
+                      )
+                    }
                   className="w-full px-3 py-2 text-sm sm:text-base rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label={t('fontSize')}
                 >
-                  <option value="small">
-                    {t('small') || 'Small'} (14px)
-                  </option>
-                  <option value="medium">
-                    {t('medium') || 'Medium'} (16px)
-                  </option>
-                  <option value="large">
-                    {t('large') || 'Large'} (18px)
-                  </option>
-                  <option value="extra-large">
-                    {t('extraLarge') || 'Extra Large'} (20px)
-                  </option>
+                  <option value="small">{t('small') || 'Small'} (14px)</option>
+                  <option value="medium">{t('medium') || 'Medium'} (16px)</option>
+                  <option value="large">{t('large') || 'Large'} (18px)</option>
+                  <option value="extra-large">{t('extraLarge') || 'Extra Large'} (20px)</option>
                 </select>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {t('fontSizeDescription') || 'Adjust the size of text throughout the application.'}
+                  {t('fontSizeDescription') ||
+                    'Adjust the size of text throughout the application.'}
                 </p>
               </div>
             </div>
@@ -200,7 +193,8 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                   />
                 </label>
                 <p className="text-xs sm:text-sm text-muted-foreground">
-                  {t('screenReaderDescription') || 'Enable screen reader mode for better accessibility.'}
+                  {t('screenReaderDescription') ||
+                    'Enable screen reader mode for better accessibility.'}
                 </p>
               </div>
             </div>
@@ -243,15 +237,13 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                   <kbd className="px-2 py-1 bg-muted rounded text-foreground text-xs">Enter</kbd>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">
-                    {t('newLine') || 'New line'}
-                  </span>
-                  <kbd className="px-2 py-1 bg-muted rounded text-foreground text-xs">Shift + Enter</kbd>
+                  <span className="text-muted-foreground">{t('newLine') || 'New line'}</span>
+                  <kbd className="px-2 py-1 bg-muted rounded text-foreground text-xs">
+                    Shift + Enter
+                  </kbd>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">
-                    {t('closePanel') || 'Close panel'}
-                  </span>
+                  <span className="text-muted-foreground">{t('closePanel') || 'Close panel'}</span>
                   <kbd className="px-2 py-1 bg-muted rounded text-foreground text-xs">Esc</kbd>
                 </div>
               </div>

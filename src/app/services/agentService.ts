@@ -5,12 +5,7 @@
  * Supports both streaming (SSE) and non-streaming requests.
  */
 
-import type {
-  AgentResponse,
-  AgentConfig,
-  AskQueryParams,
-  StreamEvent,
-} from '../types/agent';
+import type { AgentResponse, AgentConfig, AskQueryParams, StreamEvent } from '../types/agent';
 
 // Get gateway URL from environment or fallback to localhost
 // In development with Vite proxy, use /api prefix
@@ -26,9 +21,7 @@ function resolveGatewayUrl(rawUrl: string): string {
 
   const currentHost = window.location.hostname;
   const isCurrentHostLocal =
-    currentHost === 'localhost' ||
-    currentHost === '127.0.0.1' ||
-    currentHost === '::1';
+    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
 
   if (isCurrentHostLocal) {
     return rawUrl;
@@ -70,6 +63,18 @@ const isAgentDebugEnabled = (): boolean => {
 
   return false;
 };
+
+function emitAgentDebugEvent(scope: string, message: string, data?: unknown): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('vecinita:agent-debug', {
+      detail: { scope, message, data },
+    })
+  );
+}
 
 function normalizeApiBaseUrl(baseUrl: string): string {
   const normalizedInput = (baseUrl || '').trim().replace(/\/+$/, '');
@@ -127,19 +132,12 @@ class AgentServiceClient {
       return;
     }
 
-    if (data === undefined) {
-      console.info(`[agentService] ${message}`);
-      return;
-    }
-
-    console.info(`[agentService] ${message}`, data);
+    emitAgentDebugEvent('agentService', message, data);
   }
 
   private buildEndpointUrl(path: string): URL {
     const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    const normalizedBase = this.baseUrl.endsWith('/')
-      ? this.baseUrl.slice(0, -1)
-      : this.baseUrl;
+    const normalizedBase = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
 
     if (/^https?:\/\//i.test(normalizedBase)) {
       return new URL(`${normalizedBase}${normalizedPath}`);
@@ -190,10 +188,7 @@ class AgentServiceClient {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new AgentServiceError(
-          `Agent request failed: ${errorText}`,
-          response.status
-        );
+        throw new AgentServiceError(`Agent request failed: ${errorText}`, response.status);
       }
 
       return await response.json();
@@ -206,17 +201,9 @@ class AgentServiceClient {
 
       if (error instanceof Error) {
         if (error.name === 'AbortError') {
-          throw new AgentServiceError(
-            'Request timeout - please try again',
-            504,
-            'TIMEOUT'
-          );
+          throw new AgentServiceError('Request timeout - please try again', 504, 'TIMEOUT');
         }
-        throw new AgentServiceError(
-          `Network error: ${error.message}`,
-          0,
-          'NETWORK_ERROR'
-        );
+        throw new AgentServiceError(`Network error: ${error.message}`, 0, 'NETWORK_ERROR');
       }
 
       throw new AgentServiceError('Unknown error occurred', 0, 'UNKNOWN');
@@ -230,10 +217,7 @@ class AgentServiceClient {
    * @param onEvent Callback for each streaming event
    * @returns Promise that resolves when stream completes
    */
-  async askStream(
-    params: AskQueryParams,
-    onEvent: (event: StreamEvent) => void
-  ): Promise<void> {
+  async askStream(params: AskQueryParams, onEvent: (event: StreamEvent) => void): Promise<void> {
     const url = this.buildEndpointUrl('/ask/stream');
 
     // Add query parameters
@@ -259,11 +243,7 @@ class AgentServiceClient {
       const timeoutId = setTimeout(() => {
         eventSource.close();
         reject(
-          new AgentServiceError(
-            'Stream timeout - request took too long',
-            504,
-            'STREAM_TIMEOUT'
-          )
+          new AgentServiceError('Stream timeout - request took too long', 504, 'STREAM_TIMEOUT')
         );
       }, STREAM_TIMEOUT);
 
@@ -287,13 +267,7 @@ class AgentServiceClient {
         });
         clearTimeout(timeoutId);
         eventSource.close();
-        reject(
-          new AgentServiceError(
-            'Stream stalled before first event',
-            408,
-            'STREAM_STALLED'
-          )
-        );
+        reject(new AgentServiceError('Stream stalled before first event', 408, 'STREAM_STALLED'));
       }, STREAM_FIRST_EVENT_TIMEOUT);
 
       eventSource.onmessage = (event) => {
@@ -329,9 +303,7 @@ class AgentServiceClient {
 
           reject(
             new AgentServiceError(
-              callbackError instanceof Error
-                ? callbackError.message
-                : 'Stream callback failed',
+              callbackError instanceof Error ? callbackError.message : 'Stream callback failed',
               0,
               'STREAM_CALLBACK_ERROR'
             )
@@ -370,13 +342,7 @@ class AgentServiceClient {
           firstEventReceived,
           error,
         });
-        reject(
-          new AgentServiceError(
-            'Stream connection failed',
-            0,
-            'STREAM_ERROR'
-          )
-        );
+        reject(new AgentServiceError('Stream connection failed', 0, 'STREAM_ERROR'));
       };
     });
   }
@@ -400,10 +366,7 @@ class AgentServiceClient {
         });
 
         if (!response.ok) {
-          throw new AgentServiceError(
-            'Failed to fetch agent configuration',
-            response.status
-          );
+          throw new AgentServiceError('Failed to fetch agent configuration', response.status);
         }
 
         return await response.json();
@@ -424,11 +387,7 @@ class AgentServiceClient {
       throw lastError;
     }
 
-    throw new AgentServiceError(
-      'Failed to connect to agent service',
-      0,
-      'NETWORK_ERROR'
-    );
+    throw new AgentServiceError('Failed to connect to agent service', 0, 'NETWORK_ERROR');
   }
 
   /**

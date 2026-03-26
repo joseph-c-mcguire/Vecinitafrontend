@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 interface AccessibilitySettings {
   fontSize: 'small' | 'medium' | 'large' | 'extra-large';
@@ -24,9 +24,9 @@ interface AccessibilityContextType {
 const AccessibilityContext = createContext<AccessibilityContextType | undefined>(undefined);
 
 const fontSizeMap = {
-  'small': '14px',
-  'medium': '16px',
-  'large': '18px',
+  small: '14px',
+  medium: '16px',
+  large: '18px',
   'extra-large': '20px',
 };
 

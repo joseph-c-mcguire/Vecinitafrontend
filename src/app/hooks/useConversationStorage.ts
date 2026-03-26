@@ -32,24 +32,42 @@ interface StoredConversation {
 
 const STORAGE_PREFIX = 'vecinita-thread-';
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const MAX_CONVERSATIONS = 20;         // max stored threads
-const MAX_MESSAGES_PER_THREAD = 100;  // cap per thread to avoid quota overflow
+const MAX_CONVERSATIONS = 20; // max stored threads
+const MAX_MESSAGES_PER_THREAD = 100; // cap per thread to avoid quota overflow
 
 /** Safe localStorage wrapper — never throws (private browsing, quota, etc.) */
 const safeStorage = {
   get: (key: string): string | null => {
-    try { return localStorage.getItem(key); } catch { return null; }
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return null;
+    }
   },
   set: (key: string, value: string): boolean => {
-    try { localStorage.setItem(key, value); return true; } catch { return false; }
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false;
+    }
   },
   remove: (key: string): void => {
-    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
   },
   keys: (): string[] => {
     try {
-      return Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i) ?? '').filter(Boolean);
-    } catch { return []; }
+      return Array.from(
+        { length: localStorage.length },
+        (_, i) => localStorage.key(i) ?? ''
+      ).filter(Boolean);
+    } catch {
+      return [];
+    }
   },
 };
 
@@ -171,7 +189,9 @@ export function useConversationStorage(threadId: string) {
           try {
             const data = JSON.parse(stored) as StoredConversation;
             if (data.expiresAt >= now) threadIds.push(data.threadId);
-          } catch { /* skip corrupt */ }
+          } catch {
+            /* skip corrupt */
+          }
         }
       }
     }

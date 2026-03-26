@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const DEV_ADMIN_ENABLED = (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
+const DEV_ADMIN_ENABLED =
+  (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
 const DEV_ADMIN_EMAIL = import.meta.env.VITE_DEV_ADMIN_EMAIL || '';
 const DEV_ADMIN_PASSWORD = import.meta.env.VITE_DEV_ADMIN_PASSWORD || '';
 
@@ -50,12 +51,16 @@ export default function LoginPage() {
       <div className="w-full rounded-xl border bg-card p-6 shadow-sm space-y-4">
         <div>
           <h1 className="text-xl font-semibold">Admin Login</h1>
-          <p className="text-sm text-muted-foreground mt-1">Sign in with your admin account to access the admin portal.</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Sign in with your admin account to access the admin portal.
+          </p>
         </div>
 
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="email">Email</label>
+            <label className="text-sm font-medium" htmlFor="email">
+              Email
+            </label>
             <input
               id="email"
               type="email"
@@ -68,7 +73,9 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-sm font-medium" htmlFor="password">Password</label>
+            <label className="text-sm font-medium" htmlFor="password">
+              Password
+            </label>
             <input
               id="password"
               type="password"
@@ -81,7 +88,9 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </p>
           )}
 
           <button
@@ -94,7 +103,10 @@ export default function LoginPage() {
         </form>
 
         <p className="text-xs text-muted-foreground">
-          Looking for public docs? <Link className="text-primary hover:underline" to="/documents">Browse documents</Link>
+          Looking for public docs?{' '}
+          <Link className="text-primary hover:underline" to="/documents">
+            Browse documents
+          </Link>
         </p>
       </div>
     </main>

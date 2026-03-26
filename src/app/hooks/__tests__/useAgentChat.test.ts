@@ -1,6 +1,6 @@
 /**
  * Tests for useAgentChat hook
- * 
+ *
  * Tests integration of agent service with conversation storage.
  */
 
@@ -8,11 +8,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAgentChat } from '../useAgentChat';
 import { agentService, AgentServiceError } from '../../services/agentService';
-import type { StreamEvent } from '../../types/agent';
 
 // Mock dependencies
 vi.mock('../../services/agentService', async () => {
-  const actual = await vi.importActual<typeof import('../../services/agentService')>('../../services/agentService');
+  const actual = await vi.importActual<typeof import('../../services/agentService')>(
+    '../../services/agentService'
+  );
 
   return {
     ...actual,
@@ -63,9 +64,7 @@ describe('useAgentChat', () => {
     });
 
     it('should use provided initial thread ID', () => {
-      const { result } = renderHook(() =>
-        useAgentChat({ initialThreadId: 'custom-thread' })
-      );
+      const { result } = renderHook(() => useAgentChat({ initialThreadId: 'custom-thread' }));
 
       expect(result.current.threadId).toBe('custom-thread');
     });
@@ -79,7 +78,7 @@ describe('useAgentChat', () => {
 
   describe('sendMessage', () => {
     it('should send message and handle successful response', async () => {
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         // Simulate streaming events
         onEvent({ type: 'thinking', message: 'Searching...' });
         onEvent({
@@ -104,11 +103,7 @@ describe('useAgentChat', () => {
     });
 
     it('should update streaming message during processing', async () => {
-      let eventCallback: ((event: StreamEvent) => void) | null = null;
-
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
-        eventCallback = onEvent;
-        
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         setTimeout(() => {
           onEvent({ type: 'thinking', message: 'Searching documents...' });
         }, 0);
@@ -200,10 +195,8 @@ describe('useAgentChat', () => {
 
     it('should call onError callback on failure', async () => {
       const onError = vi.fn();
-      
-      vi.mocked(agentService.askStream).mockRejectedValue(
-        new Error('Network error')
-      );
+
+      vi.mocked(agentService.askStream).mockRejectedValue(new Error('Network error'));
 
       const { result } = renderHook(() => useAgentChat({ onError }));
 
@@ -267,7 +260,7 @@ describe('useAgentChat', () => {
     });
 
     it('should update thread ID from response', async () => {
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         onEvent({
           type: 'complete',
           answer: 'Test',
@@ -420,9 +413,7 @@ describe('useAgentChat', () => {
     });
 
     it('should clear error state', async () => {
-      vi.mocked(agentService.askStream).mockRejectedValue(
-        new Error('Test error')
-      );
+      vi.mocked(agentService.askStream).mockRejectedValue(new Error('Test error'));
       vi.mocked(agentService.ask).mockRejectedValue(
         new AgentServiceError('Fallback failed', 500, 'FALLBACK_FAILED')
       );
@@ -459,7 +450,7 @@ describe('useAgentChat', () => {
 
   describe('retryLastMessage', () => {
     it('should resend last user message', async () => {
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         onEvent({ type: 'complete', answer: 'Success', sources: [] });
       });
 
@@ -493,7 +484,7 @@ describe('useAgentChat', () => {
     });
 
     it('should remove last assistant message before retry', async () => {
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         onEvent({ type: 'complete', answer: 'Retry answer', sources: [] });
       });
 
@@ -516,9 +507,7 @@ describe('useAgentChat', () => {
       });
 
       await waitFor(() => {
-        expect(result.current.messages.length).toBeGreaterThan(
-          messageCountBeforeRetry - 1
-        );
+        expect(result.current.messages.length).toBeGreaterThan(messageCountBeforeRetry - 1);
       });
     });
 
@@ -535,7 +524,7 @@ describe('useAgentChat', () => {
 
   describe('source mapping', () => {
     it('should map agent sources to message sources format', async () => {
-      vi.mocked(agentService.askStream).mockImplementation(async (params, onEvent) => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
         onEvent({
           type: 'complete',
           answer: 'Test',

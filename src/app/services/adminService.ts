@@ -7,8 +7,9 @@
 
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '../../lib/supabase';
 
-const DEV_ADMIN_ENABLED = (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
-const DEV_ADMIN_STORAGE_KEY = 'vecinita-dev-admin-session'
+const DEV_ADMIN_ENABLED =
+  (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
+const DEV_ADMIN_STORAGE_KEY = 'vecinita-dev-admin-session';
 function _getDevAdminToken(): string | null {
   if (!DEV_ADMIN_ENABLED) {
     return null;
@@ -211,7 +212,11 @@ export interface BatchAddSourcesResult {
   }>;
 }
 
-export async function addSource(url: string, depth = 1, tags: string[] = []): Promise<AddSourceResult> {
+export async function addSource(
+  url: string,
+  depth = 1,
+  tags: string[] = []
+): Promise<AddSourceResult> {
   const headers = await _authHeaders();
   const form = new FormData();
   form.append('url', url);
@@ -252,25 +257,28 @@ export async function addSourcesBatch(
   return _handleResponse<BatchAddSourcesResult>(res);
 }
 
-export async function deleteSource(url: string): Promise<{ status: string; chunks_deleted: number }> {
+export async function deleteSource(
+  url: string
+): Promise<{ status: string; chunks_deleted: number }> {
   const headers = await _authHeaders();
-  const res = await _fetchAdmin(
-    `/admin/sources?url=${encodeURIComponent(url)}`,
-    { method: 'DELETE', headers },
-  );
+  const res = await _fetchAdmin(`/admin/sources?url=${encodeURIComponent(url)}`, {
+    method: 'DELETE',
+    headers,
+  });
   return _handleResponse(res);
 }
 
-export async function getQueue(
-  status?: string,
-): Promise<{ jobs: QueueJob[]; total: number }> {
+export async function getQueue(status?: string): Promise<{ jobs: QueueJob[]; total: number }> {
   const headers = await _authHeaders();
   const params = status ? `?status=${encodeURIComponent(status)}` : '';
   const res = await _fetchAdmin(`/admin/queue${params}`, { headers });
   return _handleResponse(res);
 }
 
-export async function getQueueStatusSummary(): Promise<{ statuses: QueueStatusSummaryItem[]; total_jobs: number }> {
+export async function getQueueStatusSummary(): Promise<{
+  statuses: QueueStatusSummaryItem[];
+  total_jobs: number;
+}> {
   const headers = await _authHeaders();
   const res = await _fetchAdmin('/admin/queue/status-summary', { headers });
   return _handleResponse(res);
@@ -343,11 +351,23 @@ export interface AdminSource {
   tags?: string[];
 }
 
-export async function getSources(page = 1, limit = 50): Promise<{ sources: AdminSource[]; total: number }> {
+export async function getSources(
+  page = 1,
+  limit = 50
+): Promise<{ sources: AdminSource[]; total: number }> {
   const headers = await _authHeaders();
   const offset = (page - 1) * limit;
   const res = await _fetchAdmin(`/admin/sources?limit=${limit}&offset=${offset}`, { headers });
-  const payload = await _handleResponse<{ sources: any[]; total: number }>(res);
+  type AdminSourcePayload = Partial<AdminSource> & {
+    domain?: string;
+    source_domain?: string;
+    chunk_count?: number;
+    total_chunks?: number;
+    tags?: unknown;
+    metadata?: unknown;
+  };
+
+  const payload = await _handleResponse<{ sources: AdminSourcePayload[]; total: number }>(res);
   const toMetadataObject = (raw: unknown): Record<string, unknown> => {
     if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
       return raw as Record<string, unknown>;
@@ -365,21 +385,33 @@ export async function getSources(page = 1, limit = 50): Promise<{ sources: Admin
     return {};
   };
 
-  const sources = (payload.sources ?? []).map((item) => ({
-    ...item,
-    metadata: toMetadataObject(item.metadata),
-    domain: item.domain ?? item.source_domain,
-    source_domain: item.source_domain ?? item.domain,
-    total_chunks: item.total_chunks ?? item.chunk_count ?? 0,
-    is_active: item.is_active ?? true,
-    scrape_count: item.scrape_count ?? 0,
-    total_characters: item.total_characters ?? 0,
-    tags: Array.isArray(item.tags)
-      ? item.tags
-      : Array.isArray(toMetadataObject(item.metadata).tags)
-        ? (toMetadataObject(item.metadata).tags as string[])
-        : [],
-  }));
+  const sources: AdminSource[] = (payload.sources ?? []).map((item) => {
+    const metadata = toMetadataObject(item.metadata);
+    const metadataTags = metadata.tags;
+
+    return {
+      url: item.url ?? '',
+      title: item.title,
+      source_domain: item.source_domain ?? item.domain,
+      domain: item.domain ?? item.source_domain,
+      description: item.description,
+      author: item.author,
+      published_date: item.published_date,
+      first_scraped_at: item.first_scraped_at,
+      last_scraped_at: item.last_scraped_at,
+      scrape_count: item.scrape_count ?? 0,
+      reliability_score: item.reliability_score,
+      total_chunks: item.total_chunks ?? item.chunk_count ?? 0,
+      total_characters: item.total_characters ?? 0,
+      is_active: item.is_active ?? true,
+      metadata,
+      tags: Array.isArray(item.tags)
+        ? item.tags
+        : Array.isArray(metadataTags)
+          ? (metadataTags as string[])
+          : [],
+    };
+  });
   return { sources, total: payload.total ?? sources.length };
 }
 
@@ -401,7 +433,11 @@ export async function updateSourceTags(
   return _handleResponse(res);
 }
 
-export async function getMetadataTags(query = '', limit = 100, lang: 'en' | 'es' = 'en'): Promise<{ tags: string[]; total: number }> {
+export async function getMetadataTags(
+  query = '',
+  limit = 100,
+  lang: 'en' | 'es' = 'en'
+): Promise<{ tags: string[]; total: number }> {
   const headers = await _authHeaders();
   const params = new URLSearchParams();
   if (query) params.set('query', query);
@@ -439,7 +475,11 @@ export async function getModelConfig(): Promise<AdminModelConfigResponse> {
   return _handleResponse(res);
 }
 
-export async function updateModelConfig(payload: AdminModelConfigUpdateRequest): Promise<any> {
+  type AdminModelConfigUpdateResponse = Record<string, unknown>;
+
+export async function updateModelConfig(
+  payload: AdminModelConfigUpdateRequest
+): Promise<AdminModelConfigUpdateResponse> {
   const headers = await _authHeaders();
   const res = await _fetchAdmin('/admin/models/config', {
     method: 'POST',
@@ -449,5 +489,5 @@ export async function updateModelConfig(payload: AdminModelConfigUpdateRequest):
     },
     body: JSON.stringify(payload),
   });
-  return _handleResponse(res);
+  return _handleResponse<AdminModelConfigUpdateResponse>(res);
 }

@@ -68,15 +68,18 @@ interface EmbedConfigResponse {
 
 function toProviderMap(
   providers: Array<{ key: string; label: string }> = [],
-  modelsByProvider: Record<string, string[]> = {},
+  modelsByProvider: Record<string, string[]> = {}
 ): Record<string, { name: string; models: string[] }> {
-  return providers.reduce((acc, provider) => {
-    acc[provider.key] = {
-      name: provider.label,
-      models: modelsByProvider[provider.key] ?? [],
-    };
-    return acc;
-  }, {} as Record<string, { name: string; models: string[] }>);
+  return providers.reduce(
+    (acc, provider) => {
+      acc[provider.key] = {
+        name: provider.label,
+        models: modelsByProvider[provider.key] ?? [],
+      };
+      return acc;
+    },
+    {} as Record<string, { name: string; models: string[] }>
+  );
 }
 
 export async function fetchModelRegistry(): Promise<ModelRegistryData> {
@@ -98,7 +101,7 @@ export async function fetchModelRegistry(): Promise<ModelRegistryData> {
   const llmProviders = toProviderMap(askData.providers, askData.models);
   const embeddingProviders = toProviderMap(
     embedData.available?.providers ?? [],
-    embedData.available?.models ?? {},
+    embedData.available?.models ?? {}
   );
 
   return {
@@ -116,7 +119,10 @@ export function getDefaultLLM(registry: ModelRegistryData): { provider: string; 
   };
 }
 
-export function getDefaultEmbedding(registry: ModelRegistryData): { provider: string; model: string } {
+export function getDefaultEmbedding(registry: ModelRegistryData): {
+  provider: string;
+  model: string;
+} {
   const firstProvider = Object.keys(registry.embeddingProviders)[0];
   const firstModel = registry.embeddingProviders[firstProvider]?.models[0];
   return {

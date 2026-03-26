@@ -1,6 +1,6 @@
 /**
  * Tests for useConversationStorage hook
- * 
+ *
  * Tests local storage management for conversation history with TTL.
  */
 
@@ -72,7 +72,7 @@ describe('useConversationStorage', () => {
 
       const stored = localStorage.getItem(`vecinita-thread-${threadId}`);
       expect(stored).toBeTruthy();
-      
+
       const parsed = JSON.parse(stored!);
       expect(parsed.messages).toHaveLength(2);
       expect(parsed.threadId).toBe(threadId);
@@ -90,8 +90,8 @@ describe('useConversationStorage', () => {
 
       const stored = localStorage.getItem(`vecinita-thread-${threadId}`);
       const parsed = JSON.parse(stored!);
-      
-      const expectedExpiry = now + 24 * 60 * 60 *1000;
+
+      const expectedExpiry = now + 24 * 60 * 60 * 1000;
       expect(parsed.expiresAt).toBe(expectedExpiry);
     });
 
@@ -354,7 +354,7 @@ describe('useConversationStorage', () => {
 
     it('should return 0 for expired thread', () => {
       const now = Date.now();
-      
+
       const expiredData = {
         messages: [],
         threadId,

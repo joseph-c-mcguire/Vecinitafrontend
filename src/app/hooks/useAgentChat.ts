@@ -5,16 +5,11 @@
  * Handles streaming responses, message state, and thread management.
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { agentService, AgentServiceError } from '../services/agentService';
 import { useConversationStorage, type Message } from './useConversationStorage';
-import type {
-  StreamEvent,
-  AgentSource,
-  AskQueryParams,
-  AgentResponse,
-} from '../types/agent';
+import type { StreamEvent, AgentSource, AskQueryParams, AgentResponse } from '../types/agent';
 
 interface UseAgentChatOptions {
   initialThreadId?: string;
@@ -41,40 +36,59 @@ interface PendingClarificationState {
   questions: string[];
 }
 
+function emitAgentDebugEvent(scope: string, message: string, data?: unknown) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(
+    new CustomEvent('vecinita:agent-debug', {
+      detail: { scope, message, data },
+    })
+  );
+}
+
 export function useAgentChat(options: UseAgentChatOptions = {}) {
-  const locale: 'en' | 'es' = options.language === 'es' ? 'es' : 'en';
-  const copy = {
+  const { initialThreadId, language, provider, model, onError, service } = options;
+  const locale: 'en' | 'es' = language === 'es' ? 'es' : 'en';
+  const copy = useMemo(
+    () => ({
     connecting: locale === 'es' ? 'Conectando con el backend...' : 'Connecting to backend...',
     generating: locale === 'es' ? 'Generando respuesta...' : 'Generating response...',
     clarificationNeeded: locale === 'es' ? 'Se necesita aclaración' : 'Clarification needed',
     toolSummaryTitle: locale === 'es' ? 'Resumen de herramientas' : 'Tool Summary',
-    emptyResponse: locale === 'es'
-      ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
-      : 'I could not generate a response right now. Please try again.',
-    unexpectedError: locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
-    encounteredErrorPrefix: locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
-  };
+    emptyResponse:
+      locale === 'es'
+        ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
+        : 'I could not generate a response right now. Please try again.',
+    unexpectedError:
+      locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
+    encounteredErrorPrefix:
+      locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
+    }),
+    [locale]
+  );
 
-  const serviceClient = options.service || agentService;
+  const serviceClient = useMemo(() => service || agentService, [service]);
   const chatDebugEnabled =
-    ((import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true')
-    || (typeof window !== 'undefined' && window.localStorage.getItem('vecinita_debug_chat') === '1');
+    (import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true' ||
+    (typeof window !== 'undefined' && window.localStorage.getItem('vecinita_debug_chat') === '1');
 
-  const debugLog = (...args: unknown[]) => {
+  const debugLog = useCallback((message: string, data?: unknown) => {
     if (!chatDebugEnabled) {
       return;
     }
-    console.info('[useAgentChat]', ...args);
-  };
-  const [threadId, setThreadId] = useState<string>(
-    options.initialThreadId || uuidv4()
-  );
+
+    emitAgentDebugEvent('useAgentChat', message, data);
+  }, [chatDebugEnabled]);
+  const [threadId, setThreadId] = useState<string>(initialThreadId || uuidv4());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
   const [error, setError] = useState<AgentServiceError | null>(null);
   const [progressMessages, setProgressMessages] = useState<string[]>([]);
-  const [pendingClarification, setPendingClarification] = useState<PendingClarificationState | null>(null);
+  const [pendingClarification, setPendingClarification] =
+    useState<PendingClarificationState | null>(null);
   const [streamProgress, setStreamProgress] = useState<StreamProgressState>({
     stage: 'Starting',
     percent: 0,
@@ -95,43 +109,47 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     });
   }, []);
 
-  const localizeStreamMessage = useCallback((message?: string) => {
-    const raw = (message || '').trim();
-    if (!raw || locale !== 'es') {
+  const localizeStreamMessage = useCallback(
+    (message?: string) => {
+      const raw = (message || '').trim();
+      if (!raw || locale !== 'es') {
+        return raw;
+      }
+
+      const exactMap: Record<string, string> = {
+        'Checking if I already know this...': 'Verificando si ya conozco esto...',
+        'Looking through our local resources...': 'Revisando nuestros recursos locales...',
+        'I need a bit more information...': 'Necesito un poco mas de informacion...',
+        'Searching for additional information...': 'Buscando informacion adicional...',
+        'Let me think about your question...': 'Dejame pensar en tu pregunta...',
+        'Understanding your question...': 'Entendiendo tu pregunta...',
+        'Finding relevant information...': 'Encontrando informacion relevante...',
+        'Finalizing answer...': 'Finalizando respuesta...',
+        'User clarification is required.': 'Se requieren aclaraciones del usuario.',
+        'Tool call completed.': 'Herramienta completada.',
+        'I need more details to continue.': 'Necesito mas informacion para continuar.',
+        'Service temporarily unavailable. Please try again in a moment.':
+          'Servicio temporalmente no disponible. Intentalo de nuevo en un momento.',
+      };
+
+      if (exactMap[raw]) {
+        return exactMap[raw];
+      }
+
+      const dbSearchSummary = raw.match(/^db_search returned (\d+) relevant chunks\.$/i);
+      if (dbSearchSummary) {
+        return `db_search devolvio ${dbSearchSummary[1]} fragmentos relevantes.`;
+      }
+
+      const webSearchSummary = raw.match(/^web_search returned (\d+) web results\.$/i);
+      if (webSearchSummary) {
+        return `web_search devolvio ${webSearchSummary[1]} resultados web.`;
+      }
+
       return raw;
-    }
-
-    const exactMap: Record<string, string> = {
-      'Checking if I already know this...': 'Verificando si ya conozco esto...',
-      'Looking through our local resources...': 'Revisando nuestros recursos locales...',
-      'I need a bit more information...': 'Necesito un poco mas de informacion...',
-      'Searching for additional information...': 'Buscando informacion adicional...',
-      'Let me think about your question...': 'Dejame pensar en tu pregunta...',
-      'Understanding your question...': 'Entendiendo tu pregunta...',
-      'Finding relevant information...': 'Encontrando informacion relevante...',
-      'Finalizing answer...': 'Finalizando respuesta...',
-      'User clarification is required.': 'Se requieren aclaraciones del usuario.',
-      'Tool call completed.': 'Herramienta completada.',
-      'I need more details to continue.': 'Necesito mas informacion para continuar.',
-      'Service temporarily unavailable. Please try again in a moment.': 'Servicio temporalmente no disponible. Intentalo de nuevo en un momento.',
-    };
-
-    if (exactMap[raw]) {
-      return exactMap[raw];
-    }
-
-    const dbSearchSummary = raw.match(/^db_search returned (\d+) relevant chunks\.$/i);
-    if (dbSearchSummary) {
-      return `db_search devolvio ${dbSearchSummary[1]} fragmentos relevantes.`;
-    }
-
-    const webSearchSummary = raw.match(/^web_search returned (\d+) web results\.$/i);
-    if (webSearchSummary) {
-      return `web_search devolvio ${webSearchSummary[1]} resultados web.`;
-    }
-
-    return raw;
-  }, [locale]);
+    },
+    [locale]
+  );
 
   const formatStageLabel = useCallback((stage?: string) => {
     if (!stage) {
@@ -155,7 +173,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     if (loadedMessages) {
       setMessages(loadedMessages);
     }
-  }, [threadId]); // storage.loadMessages is stable but we only load on threadId change
+  }, [storage]);
 
   /**
    * Convert agent sources to message sources format.
@@ -221,9 +239,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       const requestParams: AskQueryParams = {
         question: activeClarification?.originalQuestion || question,
         thread_id: threadId,
-        lang: options.language,
-        provider: options.provider,
-        model: options.model,
+        lang: language,
+        provider,
+        model,
         clarification_response: activeClarification ? question : undefined,
       };
 
@@ -269,121 +287,116 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             .join(' ');
 
         // Stream response from agent
-        await serviceClient.askStream(
-          requestParams,
-          (event: StreamEvent) => {
-            streamEventCount += 1;
-            debugLog('stream:event', { type: event.type, count: streamEventCount });
-            switch (event.type) {
-              case 'thinking':
-                setStreamingMessage(localizeStreamMessage(event.message));
-                updateProgressFromEvent(event);
-                appendProgressMessage(`• ${localizeStreamMessage(event.message)}`);
-                break;
+        await serviceClient.askStream(requestParams, (event: StreamEvent) => {
+          streamEventCount += 1;
+          debugLog('stream:event', { type: event.type, count: streamEventCount });
+          switch (event.type) {
+            case 'thinking':
+              setStreamingMessage(localizeStreamMessage(event.message));
+              updateProgressFromEvent(event);
+              appendProgressMessage(`• ${localizeStreamMessage(event.message)}`);
+              break;
 
-              case 'token':
-                // Accumulate tokens as they stream in
-                assistantContent += (event.content || '');
-                // Update UI with streaming response
-                setStreamingMessage(copy.generating);
-                break;
+            case 'token':
+              // Accumulate tokens as they stream in
+              assistantContent += event.content || '';
+              // Update UI with streaming response
+              setStreamingMessage(copy.generating);
+              break;
 
-              case 'source':
-                // Add source as it's discovered
-                if (event.url && event.title) {
-                  assistantSources.push({
-                    url: event.url,
-                    title: event.title,
-                    type: event.source_type || 'document',
-                  } as AgentSource);
-                }
-                break;
+            case 'source':
+              // Add source as it's discovered
+              if (event.url && event.title) {
+                assistantSources.push({
+                  url: event.url,
+                  title: event.title,
+                  type: event.source_type || 'document',
+                } as AgentSource);
+              }
+              break;
 
-              case 'complete':
-                sawCompleteEvent = true;
-                assistantContent = event.answer;
-                assistantSources = event.sources || assistantSources;
-                setPendingClarification(null);
-                if (event.thread_id) {
-                  newThreadId = event.thread_id;
-                }
-                // Store metadata for debugging (not shown to user)
-                console.debug('Streaming complete. Metadata:', event.metadata);
-                setStreamingMessage(null);
-                setStreamProgress({
-                  stage: 'Complete',
-                  percent: event.metadata?.progress ?? 100,
-                  waiting: false,
-                  status: 'working',
-                });
-                break;
+            case 'complete':
+              sawCompleteEvent = true;
+              assistantContent = event.answer;
+              assistantSources = event.sources || assistantSources;
+              setPendingClarification(null);
+              if (event.thread_id) {
+                newThreadId = event.thread_id;
+              }
+              debugLog('stream:complete', { metadata: event.metadata });
+              setStreamingMessage(null);
+              setStreamProgress({
+                stage: 'Complete',
+                percent: event.metadata?.progress ?? 100,
+                waiting: false,
+                status: 'working',
+              });
+              break;
 
-              case 'clarification':
-                // Handle clarification requests
-                {
-                  sawClarificationEvent = true;
-                  const clarificationMessage = localizeStreamMessage(event.message)
-                    || (event.questions && event.questions.length > 0
-                      ? event.questions.join(' ')
-                      : 'Please provide more details so I can continue.');
-                  const clarificationQuestions = (event.questions || event.suggestedQuestions || [])
-                    .filter((value): value is string => Boolean(value && value.trim()))
-                    .slice(0, 3);
+            case 'clarification':
+              // Handle clarification requests
+              {
+                sawClarificationEvent = true;
+                const clarificationMessage =
+                  localizeStreamMessage(event.message) ||
+                  (event.questions && event.questions.length > 0
+                    ? event.questions.join(' ')
+                    : 'Please provide more details so I can continue.');
+                const clarificationQuestions = (event.questions || event.suggestedQuestions || [])
+                  .filter((value): value is string => Boolean(value && value.trim()))
+                  .slice(0, 3);
 
-                  const displayMessage = clarificationQuestions.length > 0
+                const displayMessage =
+                  clarificationQuestions.length > 0
                     ? `${copy.clarificationNeeded}:\n${clarificationMessage}\n\n${clarificationQuestions.map((item, idx) => `${idx + 1}. ${item}`).join('\n')}`
                     : `${copy.clarificationNeeded}: ${clarificationMessage}`;
-                  setStreamingMessage(displayMessage);
-                  appendProgressMessage(displayMessage);
-                  updateProgressFromEvent({
-                    stage: event.stage || 'clarification',
-                    progress: event.progress ?? 85,
-                    waiting: true,
-                    status: 'waiting',
-                  });
-                  setPendingClarification({
-                    originalQuestion: activeClarification?.originalQuestion || question,
-                    prompt: clarificationMessage,
-                    questions: clarificationQuestions,
-                  });
-                  appendAssistantEventMessage(displayMessage);
-                }
-                break;
-
-              case 'error':
+                setStreamingMessage(displayMessage);
+                appendProgressMessage(displayMessage);
                 updateProgressFromEvent({
-                  stage: event.stage || 'error',
-                  progress: event.progress ?? 100,
-                  waiting: false,
-                  status: 'error',
+                  stage: event.stage || 'clarification',
+                  progress: event.progress ?? 85,
+                  waiting: true,
+                  status: 'waiting',
                 });
-                throw new AgentServiceError(
-                  event.message,
-                  undefined,
-                  event.code
-                );
+                setPendingClarification({
+                  originalQuestion: activeClarification?.originalQuestion || question,
+                  prompt: clarificationMessage,
+                  questions: clarificationQuestions,
+                });
+                appendAssistantEventMessage(displayMessage);
+              }
+              break;
 
-              case 'tool_event':
-                setStreamingMessage(localizeStreamMessage(event.message));
-                updateProgressFromEvent(event);
-                const localizedToolMessage = localizeStreamMessage(event.message);
-                if (event.phase === 'start') {
-                  appendProgressMessage(`⏳ ${localizedToolMessage}`);
-                } else if (event.phase === 'result') {
-                  appendProgressMessage(`✅ ${localizedToolMessage}`);
-                } else {
-                  appendProgressMessage(`⚠️ ${localizedToolMessage}`);
-                }
-                if (event.phase === 'result' && event.tool && event.message) {
-                  latestToolResults.set(event.tool, localizedToolMessage);
-                }
-                break;
+            case 'error':
+              updateProgressFromEvent({
+                stage: event.stage || 'error',
+                progress: event.progress ?? 100,
+                waiting: false,
+                status: 'error',
+              });
+              throw new AgentServiceError(event.message, undefined, event.code);
+
+            case 'tool_event': {
+              setStreamingMessage(localizeStreamMessage(event.message));
+              updateProgressFromEvent(event);
+              const localizedToolMessage = localizeStreamMessage(event.message);
+              if (event.phase === 'start') {
+                appendProgressMessage(`⏳ ${localizedToolMessage}`);
+              } else if (event.phase === 'result') {
+                appendProgressMessage(`✅ ${localizedToolMessage}`);
+              } else {
+                appendProgressMessage(`⚠️ ${localizedToolMessage}`);
+              }
+              if (event.phase === 'result' && event.tool && event.message) {
+                latestToolResults.set(event.tool, localizedToolMessage);
+              }
+              break;
             }
           }
-        );
+        });
 
         if (!assistantContent.trim() && !sawClarificationEvent) {
-          console.warn('[useAgentChat] Stream finished without assistant content, attempting non-stream fallback', {
+          debugLog('stream:empty_response_fallback', {
             question,
             threadId,
             streamEventCount,
@@ -417,9 +430,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           const toolSummary = Array.from(latestToolResults.entries())
             .map(([toolName, summary]) => `• ${formatToolLabel(toolName)}\n  ${summary}`)
             .join('\n');
-          appendAssistantEventMessage(
-            `${copy.toolSummaryTitle}\n────────────\n${toolSummary}`
-          );
+          appendAssistantEventMessage(`${copy.toolSummaryTitle}\n────────────\n${toolSummary}`);
         }
 
         // Create assistant message when final answer exists
@@ -455,9 +466,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           error: err instanceof Error ? err.message : 'unknown',
         });
         let agentError =
-          err instanceof AgentServiceError
-            ? err
-            : new AgentServiceError(copy.unexpectedError);
+          err instanceof AgentServiceError ? err : new AgentServiceError(copy.unexpectedError);
 
         try {
           const fallbackResponse = await serviceClient.ask(requestParams);
@@ -510,8 +519,8 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         }
 
         setError(agentError);
-        if (options.onError) {
-          options.onError(agentError);
+        if (onError) {
+          onError(agentError);
         }
 
         // Add error message to chat
@@ -543,11 +552,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       formatStageLabel,
       localizeStreamMessage,
       pendingClarification,
-      options.language,
-      options.provider,
-      options.model,
+      language,
+      provider,
+      model,
       serviceClient,
-      options.onError,
+      onError,
+      debugLog,
       copy.clarificationNeeded,
       copy.connecting,
       copy.emptyResponse,
@@ -561,13 +571,10 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   /**
    * Load an existing thread by ID.
    */
-  const loadThread = useCallback(
-    (newThreadId: string) => {
-      setThreadId(newThreadId);
-      // Messages will be loaded by useEffect
-    },
-    []
-  );
+  const loadThread = useCallback((newThreadId: string) => {
+    setThreadId(newThreadId);
+    // Messages will be loaded by useEffect
+  }, []);
 
   /**
    * Start a completely new conversation — new thread ID, clear messages.
@@ -593,9 +600,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
    * Retry the last message (useful after errors).
    */
   const retryLastMessage = useCallback(() => {
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find((msg) => msg.role === 'user');
+    const lastUserMessage = [...messages].reverse().find((msg) => msg.role === 'user');
 
     if (lastUserMessage) {
       // Remove last assistant message if it was an error

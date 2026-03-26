@@ -5,30 +5,33 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import DocumentsDashboard from '../DocumentsDashboard';
 
 vi.mock('../../context/LanguageContext', () => ({
-  useLanguage: () => ({ t: (key: string) => ({
-    documentsTitle: 'Documents',
-    documentsSubtitle: 'Community resources and reference materials available to everyone.',
-    docsTotalSources: 'Community Sources',
-    docsTotalTopics: 'Topics',
-    docsVisibleResources: 'Visible Resources',
-    docsResources: 'Resources',
-    docsSearchPlaceholder: 'Search resources…',
-    docsTopics: 'Topics',
-    docsClearFilters: 'Clear filters',
-    docsNoTopics: 'No topics available yet.',
-    docsSourcesLabel: 'sources',
-    docsResource: 'Resource',
-    docsActions: 'Actions',
-    docsNoResults: 'No resources match your filters.',
-    docsOpenSource: 'Open source',
-    docsDownload: 'Download',
-    docsLoading: 'Loading resources…',
-    docsLoadFailed: 'Failed to load resources',
-    docsUnknownError: 'Unknown error',
-    docsDownloadError: 'Unable to resolve a download link',
-    docsNoDownloadAvailable: 'This resource does not have a downloadable file.',
-    docsDownloadFailed: 'Failed to download resource',
-  }[key] ?? key) }),
+  useLanguage: () => ({
+    t: (key: string) =>
+      ({
+        documentsTitle: 'Documents',
+        documentsSubtitle: 'Community resources and reference materials available to everyone.',
+        docsTotalSources: 'Community Sources',
+        docsTotalTopics: 'Topics',
+        docsVisibleResources: 'Visible Resources',
+        docsResources: 'Resources',
+        docsSearchPlaceholder: 'Search resources…',
+        docsTopics: 'Topics',
+        docsClearFilters: 'Clear filters',
+        docsNoTopics: 'No topics available yet.',
+        docsSourcesLabel: 'sources',
+        docsResource: 'Resource',
+        docsActions: 'Actions',
+        docsNoResults: 'No resources match your filters.',
+        docsOpenSource: 'Open source',
+        docsDownload: 'Download',
+        docsLoading: 'Loading resources…',
+        docsLoadFailed: 'Failed to load resources',
+        docsUnknownError: 'Unknown error',
+        docsDownloadError: 'Unable to resolve a download link',
+        docsNoDownloadAvailable: 'This resource does not have a downloadable file.',
+        docsDownloadFailed: 'Failed to download resource',
+      })[key] ?? key,
+  }),
 }));
 
 describe('DocumentsDashboard integration', () => {

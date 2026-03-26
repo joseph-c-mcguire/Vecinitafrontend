@@ -10,7 +10,7 @@
  * Redirects to / if not authenticated.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Link2,
@@ -52,7 +52,7 @@ import { Label } from '../components/ui/label';
 function formatTranslation(template: string, vars: Record<string, string | number>) {
   return Object.entries(vars).reduce(
     (accumulator, [key, value]) => accumulator.replace(`{${key}}`, String(value)),
-    template,
+    template
   );
 }
 
@@ -72,9 +72,7 @@ function TabButton({
       onClick={onClick}
       variant={active ? 'secondary' : 'ghost'}
       className={`rounded-t-lg ${
-        active
-          ? 'border border-b-card text-foreground -mb-px'
-          : 'text-muted-foreground'
+        active ? 'border border-b-card text-foreground -mb-px' : 'text-muted-foreground'
       }`}
     >
       {children}
@@ -85,12 +83,30 @@ function TabButton({
 function StatusBadge({ status }: { status: QueueJob['status'] }) {
   const { t } = useLanguage();
   const map: Record<QueueJob['status'], { icon: React.ReactNode; cls: string }> = {
-    pending: { icon: <Clock size={12} />, cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' },
-    running: { icon: <Loader2 size={12} className="animate-spin" />, cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-    processing: { icon: <Loader2 size={12} className="animate-spin" />, cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-    done: { icon: <CheckCircle2 size={12} />, cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-    completed: { icon: <CheckCircle2 size={12} />, cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-    failed: { icon: <XCircle size={12} />, cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' },
+    pending: {
+      icon: <Clock size={12} />,
+      cls: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    },
+    running: {
+      icon: <Loader2 size={12} className="animate-spin" />,
+      cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    },
+    processing: {
+      icon: <Loader2 size={12} className="animate-spin" />,
+      cls: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    },
+    done: {
+      icon: <CheckCircle2 size={12} />,
+      cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    },
+    completed: {
+      icon: <CheckCircle2 size={12} />,
+      cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    },
+    failed: {
+      icon: <XCircle size={12} />,
+      cls: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    },
   };
   const { icon, cls } = map[status] ?? map.pending;
   const statusLabelMap: Partial<Record<QueueJob['status'], string>> = {
@@ -102,7 +118,9 @@ function StatusBadge({ status }: { status: QueueJob['status'] }) {
     failed: t('adminFailed'),
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+    <span
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}
+    >
       {icon}
       {statusLabelMap[status] ?? status}
     </span>
@@ -165,7 +183,9 @@ function SourcesTab() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,7 +213,9 @@ function SourcesTab() {
       const result = await addSource(url.trim(), depth, normalizedTags);
       if (result.status === 'completed') {
         setMessage({
-          text: formatTranslation(t('adminAddedSourceIndexed'), { count: result.chunks_inserted ?? 0 }),
+          text: formatTranslation(t('adminAddedSourceIndexed'), {
+            count: result.chunks_inserted ?? 0,
+          }),
           ok: true,
         });
       } else {
@@ -266,7 +288,10 @@ function SourcesTab() {
     setMessage(null);
     try {
       const res = await deleteSource(sourceUrl);
-      setMessage({ text: formatTranslation(t('adminDeletedChunks'), { count: res.chunks_deleted }), ok: true });
+      setMessage({
+        text: formatTranslation(t('adminDeletedChunks'), { count: res.chunks_deleted }),
+        ok: true,
+      });
       await load();
     } catch (e) {
       setMessage({ text: String(e), ok: false });
@@ -284,48 +309,47 @@ function SourcesTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleAdd} className="space-y-3">
-        <div className="flex gap-2">
-          <Input
-            type="url"
-            placeholder="https://example.com/page"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            required
-            className="flex-1"
-          />
-          <select
-            value={depth}
-            onChange={(e) => setDepth(Number(e.target.value))}
-            className="rounded-md border bg-background px-2 py-2 text-sm focus:outline-none"
-            title={t('adminCrawlDepth')}
-          >
-            {[0, 1, 2, 3].map((d) => (
-              <option key={d} value={d}>{t('adminDepth')} {d}</option>
-            ))}
-          </select>
-          <Button
-            type="submit"
-            disabled={adding}
-          >
-            {adding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-            {t('adminAdd')}
-          </Button>
-        </div>
-        <div className="space-y-1">
-          <Input
-            type="text"
-            value={tagsText}
-            onChange={(e) => setTagsText(e.target.value)}
-            list="admin-tag-suggestions"
-            placeholder={t('adminTagsPlaceholder')}
-          />
-          <p className="text-xs text-muted-foreground">{t('adminTagsAutocompleteHint')}</p>
-        </div>
-        <datalist id="admin-tag-suggestions">
-          {tagSuggestions.map((tag) => (
-            <option key={tag} value={tag} />
-          ))}
-        </datalist>
+            <div className="flex gap-2">
+              <Input
+                type="url"
+                placeholder="https://example.com/page"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                required
+                className="flex-1"
+              />
+              <select
+                value={depth}
+                onChange={(e) => setDepth(Number(e.target.value))}
+                className="rounded-md border bg-background px-2 py-2 text-sm focus:outline-none"
+                title={t('adminCrawlDepth')}
+              >
+                {[0, 1, 2, 3].map((d) => (
+                  <option key={d} value={d}>
+                    {t('adminDepth')} {d}
+                  </option>
+                ))}
+              </select>
+              <Button type="submit" disabled={adding}>
+                {adding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
+                {t('adminAdd')}
+              </Button>
+            </div>
+            <div className="space-y-1">
+              <Input
+                type="text"
+                value={tagsText}
+                onChange={(e) => setTagsText(e.target.value)}
+                list="admin-tag-suggestions"
+                placeholder={t('adminTagsPlaceholder')}
+              />
+              <p className="text-xs text-muted-foreground">{t('adminTagsAutocompleteHint')}</p>
+            </div>
+            <datalist id="admin-tag-suggestions">
+              {tagSuggestions.map((tag) => (
+                <option key={tag} value={tag} />
+              ))}
+            </datalist>
           </form>
         </CardContent>
       </Card>
@@ -336,41 +360,44 @@ function SourcesTab() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleBatchAdd} className="space-y-3">
-        <textarea
-          value={batchUrlsText}
-          onChange={(e) => setBatchUrlsText(e.target.value)}
-          placeholder={t('adminBatchUrlsPlaceholder')}
-          className="w-full min-h-36 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-          required
-        />
-        <div className="grid gap-2 sm:grid-cols-2">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t('adminBatchTagModeLabel')}</Label>
-            <Input
-              type="text"
-              value={t('adminBatchTagModeAutoInfer')}
-              readOnly
-              className="text-muted-foreground"
+            <textarea
+              value={batchUrlsText}
+              onChange={(e) => setBatchUrlsText(e.target.value)}
+              placeholder={t('adminBatchUrlsPlaceholder')}
+              className="w-full min-h-36 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+              required
             />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">{t('adminTags')}</Label>
-            <Input
-              type="text"
-              value={batchTagsText}
-              onChange={(e) => setBatchTagsText(e.target.value)}
-              list="admin-tag-suggestions"
-              placeholder={t('adminTagsPlaceholder')}
-            />
-          </div>
-        </div>
-        <Button
-          type="submit"
-          disabled={batchAdding}
-        >
-          {batchAdding ? <Loader2 size={14} className="animate-spin" /> : <PlusCircle size={14} />}
-          {t('adminBatchIngest')}
-        </Button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">
+                  {t('adminBatchTagModeLabel')}
+                </Label>
+                <Input
+                  type="text"
+                  value={t('adminBatchTagModeAutoInfer')}
+                  readOnly
+                  className="text-muted-foreground"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t('adminTags')}</Label>
+                <Input
+                  type="text"
+                  value={batchTagsText}
+                  onChange={(e) => setBatchTagsText(e.target.value)}
+                  list="admin-tag-suggestions"
+                  placeholder={t('adminTagsPlaceholder')}
+                />
+              </div>
+            </div>
+            <Button type="submit" disabled={batchAdding}>
+              {batchAdding ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <PlusCircle size={14} />
+              )}
+              {t('adminBatchIngest')}
+            </Button>
           </form>
         </CardContent>
       </Card>
@@ -378,7 +405,9 @@ function SourcesTab() {
       {message && (
         <div
           className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
-            message.ok ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+            message.ok
+              ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+              : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
           }`}
         >
           {message.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
@@ -389,7 +418,9 @@ function SourcesTab() {
       {/* Source list */}
       <div className="rounded-xl border overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 bg-muted/40 border-b">
-          <span className="text-sm font-medium">{sources.length} {t('adminSourcesCount')}</span>
+          <span className="text-sm font-medium">
+            {sources.length} {t('adminSourcesCount')}
+          </span>
           <Button onClick={load} size="icon" variant="ghost" title={t('adminRefresh')}>
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </Button>
@@ -405,19 +436,31 @@ function SourcesTab() {
           </thead>
           <tbody className="divide-y">
             {loading && (
-              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">{t('adminLoading')}</td></tr>
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                  {t('adminLoading')}
+                </td>
+              </tr>
             )}
             {!loading && sources.length === 0 && (
-              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">{t('adminNoSourcesYet')}</td></tr>
+              <tr>
+                <td colSpan={4} className="py-6 text-center text-muted-foreground">
+                  {t('adminNoSourcesYet')}
+                </td>
+              </tr>
             )}
             {sources.map((s) => (
               <tr key={s.url} className="hover:bg-muted/20 transition-colors">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-1.5">
                     <Link2 size={12} className="text-muted-foreground shrink-0" />
-                    <span className="truncate max-w-xs font-medium">{s.title || s.source_domain || s.url.split('/')[2]}</span>
+                    <span className="truncate max-w-xs font-medium">
+                      {s.title || s.source_domain || s.url.split('/')[2]}
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate max-w-xs mt-0.5 pl-4">{s.url}</p>
+                  <p className="text-xs text-muted-foreground truncate max-w-xs mt-0.5 pl-4">
+                    {s.url}
+                  </p>
                 </td>
                 <td className="px-4 py-3">
                   {editingUrl === s.url ? (
@@ -429,16 +472,15 @@ function SourcesTab() {
                         list="admin-tag-suggestions"
                         className="h-8 text-xs"
                       />
-                      <Button
-                        onClick={() => handleSaveTags(s.url)}
-                        variant="outline"
-                        size="sm"
-                      >
+                      <Button onClick={() => handleSaveTags(s.url)} variant="outline" size="sm">
                         {t('adminSave')}
                       </Button>
                     </div>
                   ) : (
-                    <span className="text-xs text-muted-foreground truncate block max-w-56" title={tagsToText(s.tags)}>
+                    <span
+                      className="text-xs text-muted-foreground truncate block max-w-56"
+                      title={tagsToText(s.tags)}
+                    >
                       {s.tags?.length ? s.tags.join(', ') : '—'}
                     </span>
                   )}
@@ -461,10 +503,11 @@ function SourcesTab() {
                       variant="ghost"
                       title={t('adminDeleteChunks')}
                     >
-                      {deletingUrl === s.url
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : <Trash2 size={14} />
-                      }
+                      {deletingUrl === s.url ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
                     </Button>
                   </div>
                 </td>
@@ -524,7 +567,12 @@ function UploadTab() {
     try {
       const normalizedTags = normalizeTagsFromInput(tagsText);
       const res = await uploadDocument(file, normalizedTags);
-      setResult({ text: formatTranslation(t('adminUploadedChunksInserted'), { count: res.chunks_inserted ?? '?' }), ok: true });
+      setResult({
+        text: formatTranslation(t('adminUploadedChunksInserted'), {
+          count: res.chunks_inserted ?? '?',
+        }),
+        ok: true,
+      });
       setFile(null);
       setTagsText('');
     } catch (e) {
@@ -539,17 +587,20 @@ function UploadTab() {
       {/* Dropzone */}
       <div
         onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => inputRef.current?.click()}
         className={`rounded-xl border-2 border-dashed px-6 py-12 text-center cursor-pointer transition-colors ${
-          dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
+          dragOver
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:border-primary/50 hover:bg-muted/30'
         }`}
       >
         <Upload size={32} className="mx-auto mb-3 text-muted-foreground" />
-        <p className="text-sm font-medium">
-          {file ? file.name : t('adminDropFile')}
-        </p>
+        <p className="text-sm font-medium">{file ? file.name : t('adminDropFile')}</p>
         <p className="text-xs text-muted-foreground mt-1">{t('adminUploadMaxInfo')}</p>
         <input
           ref={inputRef}
@@ -564,7 +615,9 @@ function UploadTab() {
         <div className="rounded-lg border bg-card px-4 py-3 space-y-3">
           <div className="text-sm">
             <p className="font-medium">{file.name}</p>
-            <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB · {file.type || t('adminUnknownType')}</p>
+            <p className="text-xs text-muted-foreground">
+              {(file.size / 1024).toFixed(1)} KB · {file.type || t('adminUnknownType')}
+            </p>
           </div>
           <input
             type="text"
@@ -593,17 +646,19 @@ function UploadTab() {
       )}
 
       {result && (
-        <div className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
-          result.ok ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
-        }`}>
+        <div
+          className={`rounded-lg px-4 py-3 text-sm flex items-center gap-2 ${
+            result.ok
+              ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300'
+              : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'
+          }`}
+        >
           {result.ok ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
           {result.text}
         </div>
       )}
 
-      <p className="text-xs text-muted-foreground">
-        {t('adminUploadHelp')}
-      </p>
+      <p className="text-xs text-muted-foreground">{t('adminUploadHelp')}</p>
     </div>
   );
 }
@@ -618,7 +673,7 @@ function QueueTab() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const [data, summaryData] = await Promise.all([
         getQueue(statusFilter || undefined),
@@ -631,17 +686,22 @@ function QueueTab() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   // Initial load
-  useEffect(() => { setLoading(true); load(); }, [statusFilter]);
+  useEffect(() => {
+    setLoading(true);
+    void load();
+  }, [load]);
 
   // Auto-refresh every 10 s
   useEffect(() => {
     if (!autoRefresh) return;
-    const id = setInterval(() => load(), 10_000);
+    const id = setInterval(() => {
+      void load();
+    }, 10_000);
     return () => clearInterval(id);
-  }, [autoRefresh, statusFilter]);
+  }, [autoRefresh, load]);
 
   return (
     <div className="space-y-4">
@@ -671,7 +731,14 @@ function QueueTab() {
             />
             {t('adminAutoRefresh')}
           </label>
-          <button onClick={() => { setLoading(true); load(); }} className="p-1 rounded hover:bg-accent transition-colors" title={t('adminRefresh')}>
+          <button
+            onClick={() => {
+              setLoading(true);
+              load();
+            }}
+            className="p-1 rounded hover:bg-accent transition-colors"
+            title={t('adminRefresh')}
+          >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -705,18 +772,34 @@ function QueueTab() {
           </thead>
           <tbody className="divide-y">
             {loading && (
-              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">{t('adminLoading')}</td></tr>
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                  {t('adminLoading')}
+                </td>
+              </tr>
             )}
             {!loading && jobs.length === 0 && (
-              <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">{t('adminNoJobs')}</td></tr>
+              <tr>
+                <td colSpan={5} className="py-6 text-center text-muted-foreground">
+                  {t('adminNoJobs')}
+                </td>
+              </tr>
             )}
             {jobs.map((job) => (
               <tr key={job.id} className="hover:bg-muted/20 transition-colors">
-                <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">{job.url || job.file_path || '—'}</td>
-                <td className="px-4 py-3 text-center uppercase text-xs text-muted-foreground">{job.job_type || t('adminFileType')}</td>
-                <td className="px-4 py-3 text-center"><StatusBadge status={job.status} /></td>
+                <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">
+                  {job.url || job.file_path || '—'}
+                </td>
+                <td className="px-4 py-3 text-center uppercase text-xs text-muted-foreground">
+                  {job.job_type || t('adminFileType')}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <StatusBadge status={job.status} />
+                </td>
                 <td className="px-4 py-3 text-center text-xs text-muted-foreground">
-                  {job.total_chunks ? `${job.chunks_processed ?? 0}/${job.total_chunks}` : `${job.chunks_processed ?? 0}`}
+                  {job.total_chunks
+                    ? `${job.chunks_processed ?? 0}/${job.total_chunks}`
+                    : `${job.chunks_processed ?? 0}`}
                 </td>
                 <td className="px-4 py-3 text-xs text-muted-foreground">
                   {new Date(job.created_at).toLocaleString()}
@@ -733,9 +816,14 @@ function QueueTab() {
           <div>
             {t('adminFailedJobs')}
             <ul className="mt-1 list-disc list-inside space-y-0.5">
-              {jobs.filter((j) => j.status === 'failed').map((j) => (
-                <li key={j.id}><span className="font-mono">{j.url || j.file_path}</span>{j.error ? ` — ${j.error}` : ''}</li>
-              ))}
+              {jobs
+                .filter((j) => j.status === 'failed')
+                .map((j) => (
+                  <li key={j.id}>
+                    <span className="font-mono">{j.url || j.file_path}</span>
+                    {j.error ? ` — ${j.error}` : ''}
+                  </li>
+                ))}
             </ul>
           </div>
         </div>
@@ -753,8 +841,14 @@ function ModelSettingsTab() {
   const [generationModel, setGenerationModel] = useState('');
   const [embeddingProvider, setEmbeddingProvider] = useState('');
   const [embeddingModel, setEmbeddingModel] = useState('');
-  const [generationOptions, setGenerationOptions] = useState<{ providers: Array<{ key: string; label: string }>; models: Record<string, string[]> }>({ providers: [], models: {} });
-  const [embeddingOptions, setEmbeddingOptions] = useState<{ providers: Array<{ key: string; label: string }>; models: Record<string, string[]> }>({ providers: [], models: {} });
+  const [generationOptions, setGenerationOptions] = useState<{
+    providers: Array<{ key: string; label: string }>;
+    models: Record<string, string[]>;
+  }>({ providers: [], models: {} });
+  const [embeddingOptions, setEmbeddingOptions] = useState<{
+    providers: Array<{ key: string; label: string }>;
+    models: Record<string, string[]>;
+  }>({ providers: [], models: {} });
 
   const load = async () => {
     setLoading(true);
@@ -776,9 +870,17 @@ function ModelSettingsTab() {
       const nextEmbeddingModel = config.embeddings?.current?.model ?? '';
 
       setGenerationProvider(nextGenerationProvider);
-      setGenerationModel(generationModels.includes(nextGenerationModel) ? nextGenerationModel : (generationModels[0] ?? ''));
+      setGenerationModel(
+        generationModels.includes(nextGenerationModel)
+          ? nextGenerationModel
+          : (generationModels[0] ?? '')
+      );
       setEmbeddingProvider(nextEmbeddingProvider);
-      setEmbeddingModel(embeddingModels.includes(nextEmbeddingModel) ? nextEmbeddingModel : (embeddingModels[0] ?? ''));
+      setEmbeddingModel(
+        embeddingModels.includes(nextEmbeddingModel)
+          ? nextEmbeddingModel
+          : (embeddingModels[0] ?? '')
+      );
     } catch (error) {
       setMessage({ text: String(error), ok: false });
     } finally {
@@ -790,8 +892,12 @@ function ModelSettingsTab() {
     load();
   }, []);
 
-  const generationModels = generationProvider ? (generationOptions.models[generationProvider] ?? []) : [];
-  const embeddingModels = embeddingProvider ? (embeddingOptions.models[embeddingProvider] ?? []) : [];
+  const generationModels = generationProvider
+    ? (generationOptions.models[generationProvider] ?? [])
+    : [];
+  const embeddingModels = embeddingProvider
+    ? (embeddingOptions.models[embeddingProvider] ?? [])
+    : [];
 
   const onSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -799,8 +905,13 @@ function ModelSettingsTab() {
     setMessage(null);
     try {
       await updateModelConfig({
-        generation: generationProvider ? { provider: generationProvider, model: generationModel || undefined } : undefined,
-        embeddings: embeddingProvider && embeddingModel ? { provider: embeddingProvider, model: embeddingModel } : undefined,
+        generation: generationProvider
+          ? { provider: generationProvider, model: generationModel || undefined }
+          : undefined,
+        embeddings:
+          embeddingProvider && embeddingModel
+            ? { provider: embeddingProvider, model: embeddingModel }
+            : undefined,
       });
       setMessage({ text: t('adminModelConfigUpdated'), ok: true });
       await load();
@@ -820,7 +931,9 @@ function ModelSettingsTab() {
       <h3 className="text-sm font-medium">{t('adminModelConfiguration')}</h3>
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('adminGenerationModel')}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {t('adminGenerationModel')}
+          </p>
           <select
             value={generationProvider}
             onChange={(e) => {
@@ -833,7 +946,9 @@ function ModelSettingsTab() {
           >
             <option value="">{t('adminSelectProvider')}</option>
             {generationOptions.providers.map((provider) => (
-              <option key={provider.key} value={provider.key}>{provider.label}</option>
+              <option key={provider.key} value={provider.key}>
+                {provider.label}
+              </option>
             ))}
           </select>
           <select
@@ -844,13 +959,17 @@ function ModelSettingsTab() {
           >
             <option value="">{t('adminSelectModel')}</option>
             {generationModels.map((model) => (
-              <option key={model} value={model}>{model}</option>
+              <option key={model} value={model}>
+                {model}
+              </option>
             ))}
           </select>
         </div>
 
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">{t('adminEmbeddingModel')}</p>
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            {t('adminEmbeddingModel')}
+          </p>
           <select
             value={embeddingProvider}
             onChange={(e) => {
@@ -863,7 +982,9 @@ function ModelSettingsTab() {
           >
             <option value="">{t('adminSelectProvider')}</option>
             {embeddingOptions.providers.map((provider) => (
-              <option key={provider.key} value={provider.key}>{provider.label}</option>
+              <option key={provider.key} value={provider.key}>
+                {provider.label}
+              </option>
             ))}
           </select>
           <select
@@ -874,14 +995,18 @@ function ModelSettingsTab() {
           >
             <option value="">{t('adminSelectModel')}</option>
             {embeddingModels.map((model) => (
-              <option key={model} value={model}>{model}</option>
+              <option key={model} value={model}>
+                {model}
+              </option>
             ))}
           </select>
         </div>
       </div>
 
       {message && (
-        <p className={`rounded-md px-3 py-2 text-sm ${message.ok ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'}`}>
+        <p
+          className={`rounded-md px-3 py-2 text-sm ${message.ok ? 'bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-300'}`}
+        >
           {message.text}
         </p>
       )}
@@ -944,16 +1069,28 @@ export default function AdminDashboard() {
       {/* Tabs */}
       <div className="border-b flex gap-1">
         <TabButton active={tab === 'sources'} onClick={() => setTab('sources')}>
-          <span className="flex items-center gap-1.5"><List size={14} />{t('adminTabSources')}</span>
+          <span className="flex items-center gap-1.5">
+            <List size={14} />
+            {t('adminTabSources')}
+          </span>
         </TabButton>
         <TabButton active={tab === 'upload'} onClick={() => setTab('upload')}>
-          <span className="flex items-center gap-1.5"><Upload size={14} />{t('adminTabUpload')}</span>
+          <span className="flex items-center gap-1.5">
+            <Upload size={14} />
+            {t('adminTabUpload')}
+          </span>
         </TabButton>
         <TabButton active={tab === 'queue'} onClick={() => setTab('queue')}>
-          <span className="flex items-center gap-1.5"><Clock size={14} />{t('adminTabQueue')}</span>
+          <span className="flex items-center gap-1.5">
+            <Clock size={14} />
+            {t('adminTabQueue')}
+          </span>
         </TabButton>
         <TabButton active={tab === 'models'} onClick={() => setTab('models')}>
-          <span className="flex items-center gap-1.5"><Cpu size={14} />{t('adminTabModels')}</span>
+          <span className="flex items-center gap-1.5">
+            <Cpu size={14} />
+            {t('adminTabModels')}
+          </span>
         </TabButton>
       </div>
 

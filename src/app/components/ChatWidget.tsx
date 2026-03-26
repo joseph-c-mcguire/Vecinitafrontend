@@ -1,5 +1,12 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, X, MessageSquare, Minimize2, Settings as SettingsIcon, RefreshCw } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import {
+  Send,
+  X,
+  MessageSquare,
+  Minimize2,
+  Settings as SettingsIcon,
+  RefreshCw,
+} from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useBackendSettings } from '../hooks/useBackendSettings';
 import { useAgentChat } from '../hooks/useAgentChat';
@@ -18,34 +25,34 @@ interface ChatWidgetProps {
    * @default 'bottom-right'
    */
   position?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
-  
+
   /**
    * Primary color for the widget (overrides default turquoise)
    */
   primaryColor?: string;
-  
+
   /**
    * Initial open state
    * @default false
    */
   defaultOpen?: boolean;
-  
+
   /**
    * Custom welcome message
    */
   customWelcomeMessage?: string;
-  
+
   /**
    * Custom widget title
    */
   title?: string;
-  
+
   /**
    * Theme preference ('light' | 'dark' | 'auto')
    * @default 'auto'
    */
   themeMode?: 'light' | 'dark' | 'auto';
-  
+
   /**
    * z-index for the widget
    * @default 1000
@@ -83,7 +90,6 @@ export function ChatWidget({
     isLoading,
     streamingMessage,
     progressMessages = [],
-    streamProgress = { stage: 'Working', percent: 0, waiting: false, status: 'working' },
     pendingClarification = null,
     error,
     sendMessage,
@@ -142,9 +148,10 @@ export function ChatWidget({
     retryLastMessage();
   };
 
-  const progressHint = isLoading && !streamingMessage && progressMessages.length > 0
-    ? progressMessages[progressMessages.length - 1]
-    : undefined;
+  const progressHint =
+    isLoading && !streamingMessage && progressMessages.length > 0
+      ? progressMessages[progressMessages.length - 1]
+      : undefined;
 
   // Position styles
   const positionClasses = {
@@ -174,7 +181,7 @@ export function ChatWidget({
         onClick={() => setIsOpen(true)}
         size="icon"
         className={`fixed ${positionClasses[position]} h-14 w-14 rounded-full shadow-lg transition-all hover:scale-110`}
-        style={{ 
+        style={{
           backgroundColor: widgetPrimaryColor,
           color: widgetForegroundColor,
           zIndex,
@@ -195,9 +202,9 @@ export function ChatWidget({
         style={{ zIndex }}
       >
         {/* Header */}
-        <div 
+        <div
           className="flex items-center justify-between px-4 py-3 border-b border-border"
-          style={{ 
+          style={{
             backgroundColor: widgetPrimaryColor,
             color: widgetForegroundColor,
           }}
@@ -265,12 +272,14 @@ export function ChatWidget({
         {!isMinimized && (
           <>
             {/* Messages */}
-            <div className={`flex-1 overflow-y-auto bg-background ${theme === 'dark' ? 'dark' : ''}`}>
+            <div
+              className={`flex-1 overflow-y-auto bg-background ${theme === 'dark' ? 'dark' : ''}`}
+            >
               <div className="max-w-full">
                 {messages.map((message) => (
-                  <ChatMessage 
-                    key={message.id} 
-                    message={message} 
+                  <ChatMessage
+                    key={message.id}
+                    message={message}
                     onFeedbackSubmit={handleFeedbackSubmit}
                   />
                 ))}
@@ -286,7 +295,9 @@ export function ChatWidget({
                     {pendingClarification.questions.length > 0 && (
                       <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
                         {pendingClarification.questions.map((question, index) => (
-                          <li key={`${index}-${question}`}>{index + 1}. {question}</li>
+                          <li key={`${index}-${question}`}>
+                            {index + 1}. {question}
+                          </li>
                         ))}
                       </ul>
                     )}
@@ -294,9 +305,7 @@ export function ChatWidget({
                 )}
                 {error && (
                   <div className="p-4 m-3 bg-destructive/10 border border-destructive rounded-lg">
-                    <p className="text-sm text-destructive font-medium mb-2">
-                      {t('error.title')}
-                    </p>
+                    <p className="text-sm text-destructive font-medium mb-2">{t('error.title')}</p>
                     <p className="text-sm text-muted-foreground mb-3">{error.message}</p>
                     <button
                       onClick={handleRetry}
@@ -331,7 +340,7 @@ export function ChatWidget({
                   disabled={!input.trim() || isLoading}
                   size="icon"
                   className="h-9 w-9 rounded-lg hover:opacity-90"
-                  style={{ 
+                  style={{
                     backgroundColor: widgetPrimaryColor,
                     color: widgetForegroundColor,
                   }}
@@ -348,7 +357,10 @@ export function ChatWidget({
       {/* Accessibility Panel */}
       {isAccessibilityOpen && (
         <div style={{ zIndex: zIndex + 10 }}>
-          <AccessibilityPanel isOpen={isAccessibilityOpen} onClose={() => setIsAccessibilityOpen(false)} />
+          <AccessibilityPanel
+            isOpen={isAccessibilityOpen}
+            onClose={() => setIsAccessibilityOpen(false)}
+          />
         </div>
       )}
     </>

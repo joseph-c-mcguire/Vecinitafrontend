@@ -33,10 +33,18 @@ describe('adminService', () => {
 
   it('sends tags when adding a source', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ status: 'queued', url: 'https://example.com', depth: 1, tags: ['housing'] }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+      new Response(
+        JSON.stringify({
+          status: 'queued',
+          url: 'https://example.com',
+          depth: 1,
+          tags: ['housing'],
+        }),
+        {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
     );
 
     await addSource('https://example.com', 1, ['housing']);
@@ -86,7 +94,14 @@ describe('adminService', () => {
   it('sends tags during upload', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(
-        JSON.stringify({ status: 'ok', filename: 'test.txt', chunks_total: 1, chunks_inserted: 1, tags: ['food'], errors: [] }),
+        JSON.stringify({
+          status: 'ok',
+          filename: 'test.txt',
+          chunks_total: 1,
+          chunks_inserted: 1,
+          tags: ['food'],
+          errors: [],
+        }),
         {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

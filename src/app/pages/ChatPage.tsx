@@ -3,7 +3,7 @@
  * This is the "/" route.
  */
 
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Send } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 import { useBackendSettings } from '../hooks/useBackendSettings';
@@ -26,7 +26,6 @@ export default function ChatPage() {
     isLoading,
     streamingMessage,
     progressMessages,
-    streamProgress,
     pendingClarification,
     error,
     sendMessage,
@@ -59,9 +58,10 @@ export default function ChatPage() {
     }
   };
 
-  const progressHint = isLoading && !streamingMessage && progressMessages.length > 0
-    ? progressMessages[progressMessages.length - 1]
-    : undefined;
+  const progressHint =
+    isLoading && !streamingMessage && progressMessages.length > 0
+      ? progressMessages[progressMessages.length - 1]
+      : undefined;
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6">
@@ -70,12 +70,7 @@ export default function ChatPage() {
           <h1 className="text-2xl font-bold">{t('appTitle')}</h1>
           <p className="text-sm text-muted-foreground">{t('appSubtitle')}</p>
         </div>
-        <Button
-          onClick={() => clearThread()}
-          variant="outline"
-          size="sm"
-          type="button"
-        >
+        <Button onClick={() => clearThread()} variant="outline" size="sm" type="button">
           {t('newChat')}
         </Button>
       </div>
@@ -106,7 +101,9 @@ export default function ChatPage() {
               {pendingClarification.questions.length > 0 && (
                 <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
                   {pendingClarification.questions.map((question, index) => (
-                    <li key={`${index}-${question}`}>{index + 1}. {question}</li>
+                    <li key={`${index}-${question}`}>
+                      {index + 1}. {question}
+                    </li>
                   ))}
                 </ul>
               )}
