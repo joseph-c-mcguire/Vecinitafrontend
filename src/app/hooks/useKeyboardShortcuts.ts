@@ -20,9 +20,11 @@ export function useKeyboardShortcuts(shortcuts: KeyboardShortcut[], enabled = tr
       for (const shortcut of shortcuts) {
         // Safety check for undefined event.key or shortcut.key
         if (!event.key || !shortcut.key) continue;
-        
+
         const keyMatches = event.key.toLowerCase() === shortcut.key.toLowerCase();
-        const ctrlMatches = shortcut.ctrl ? event.ctrlKey || event.metaKey : !event.ctrlKey && !event.metaKey;
+        const ctrlMatches = shortcut.ctrl
+          ? event.ctrlKey || event.metaKey
+          : !event.ctrlKey && !event.metaKey;
         const altMatches = shortcut.alt ? event.altKey : !event.altKey;
         const shiftMatches = shortcut.shift ? event.shiftKey : !event.shiftKey;
         const metaMatches = shortcut.meta ? event.metaKey : !event.metaKey;

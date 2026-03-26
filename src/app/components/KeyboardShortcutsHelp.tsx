@@ -100,9 +100,7 @@ export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
                 key={index}
                 className="flex items-center justify-between py-2 border-b border-border last:border-0"
               >
-                <span className="text-foreground">
-                  {shortcut.description}
-                </span>
+                <span className="text-foreground">{shortcut.description}</span>
                 <div className="flex items-center gap-1">
                   {shortcut.keys.map((key, keyIndex) => (
                     <span key={keyIndex} className="flex items-center gap-1">
@@ -121,9 +119,7 @@ export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
 
           <div className="mt-6 p-4 bg-primary/10 rounded-lg">
             <p className="text-sm text-foreground">
-              <strong>
-                {language === 'es' ? 'Consejo:' : 'Tip:'}
-              </strong>{' '}
+              <strong>{language === 'es' ? 'Consejo:' : 'Tip:'}</strong>{' '}
               {language === 'es'
                 ? 'Usa Alt + K para abrir esta ayuda en cualquier momento.'
                 : 'Use Alt + K to open this help at any time.'}

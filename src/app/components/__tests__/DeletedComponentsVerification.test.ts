@@ -8,7 +8,7 @@ import path from 'path';
  */
 describe('Deleted Components - Codebase Verification', () => {
   const componentDir = path.resolve(__dirname, '..', '..');
-  
+
   const deletedComponents = [
     'AccessibleButton',
     'AddDocumentModal',
@@ -83,7 +83,12 @@ describe('Deleted Components - Codebase Verification', () => {
           if (scanFilesForReferences(fullPath, pattern, excludeDir)) {
             return true;
           }
-        } else if (file.name.endsWith('.ts') || file.name.endsWith('.tsx') || file.name.endsWith('.js') || file.name.endsWith('.jsx')) {
+        } else if (
+          file.name.endsWith('.ts') ||
+          file.name.endsWith('.tsx') ||
+          file.name.endsWith('.js') ||
+          file.name.endsWith('.jsx')
+        ) {
           // Skip test files for this verification (test files intentionally reference deleted components)
           if (file.name.includes('.test.')) {
             continue;
@@ -94,11 +99,11 @@ describe('Deleted Components - Codebase Verification', () => {
             // Look for imports or component usage with more specificity
             // Match: import ... from './ui/pattern' or import ... from '@/...' patterns
             const importPatterns = [
-              new RegExp(`import.*from\\s+['\"].*/${pattern}['\"]`, 'i'),
-              new RegExp(`import.*from\\s+['\"].*/${pattern}\\.tsx?['\"]`, 'i'),
+              new RegExp(`import.*from\\s+['"].*/${pattern}['"]`, 'i'),
+              new RegExp(`import.*from\\s+['"].*/${pattern}\\.tsx?['"]`, 'i'),
             ];
-            
-            if (importPatterns.some(regex => regex.test(content))) {
+
+            if (importPatterns.some((regex) => regex.test(content))) {
               return true;
             }
           } catch {

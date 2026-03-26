@@ -1,6 +1,6 @@
 /**
  * Tests for component exports
- * 
+ *
  * Ensures all components are properly exported from index.ts
  */
 
@@ -54,7 +54,7 @@ describe('Component Exports', () => {
 
   it('should have correct number of exports', () => {
     const exportedKeys = Object.keys(Components);
-    
+
     // Should have all components (11) plus default export if any
     expect(exportedKeys.length).toBeGreaterThanOrEqual(11);
   });

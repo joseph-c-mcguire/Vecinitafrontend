@@ -21,7 +21,8 @@ describe('ChatMessage source attribution', () => {
         message={{
           id: 'assistant-md-1',
           role: 'assistant',
-          content: '## Support Links\n\n- **Housing**\n- [Community Center](https://example.org/community)',
+          content:
+            '## Support Links\n\n- **Housing**\n- [Community Center](https://example.org/community)',
           timestamp: new Date(),
           sources: [],
         }}

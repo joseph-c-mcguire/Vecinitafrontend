@@ -8,7 +8,7 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #4DB8B8;
+  --primary: #4db8b8;
   --primary-foreground: #ffffff;
   --secondary: oklch(0.95 0.0058 264.53);
   --secondary-foreground: #030213;
@@ -24,7 +24,7 @@
   --switch-background: #cbced4;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: #4DB8B8;
+  --ring: #4db8b8;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -33,12 +33,12 @@
   --radius: 0.625rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #4DB8B8;
+  --sidebar-primary: #4db8b8;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: oklch(0.97 0 0);
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: #4DB8B8;
+  --sidebar-ring: #4db8b8;
 }
 
 .dark {
@@ -48,7 +48,7 @@
   --card-foreground: #e8e8e8;
   --popover: #1a1f26;
   --popover-foreground: #e8e8e8;
-  --primary: #4DB8B8;
+  --primary: #4db8b8;
   --primary-foreground: #ffffff;
   --secondary: #2a2f36;
   --secondary-foreground: #e8e8e8;
@@ -60,7 +60,7 @@
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: rgba(255, 255, 255, 0.1);
   --input: #2a2f36;
-  --ring: #4DB8B8;
+  --ring: #4db8b8;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --chart-1: oklch(0.488 0.243 264.376);
@@ -70,12 +70,12 @@
   --chart-5: oklch(0.645 0.246 16.439);
   --sidebar: #1a1f26;
   --sidebar-foreground: #e8e8e8;
-  --sidebar-primary: #4DB8B8;
+  --sidebar-primary: #4db8b8;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #2a2f36;
   --sidebar-accent-foreground: #e8e8e8;
   --sidebar-border: #2a2f36;
-  --sidebar-ring: #4DB8B8;
+  --sidebar-ring: #4db8b8;
 }
 
 @theme inline {
@@ -222,7 +222,7 @@
 
 /* Screen Reader Focus */
 .screen-reader-active *:focus {
-  outline: 3px solid #4DB8B8 !important;
+  outline: 3px solid #4db8b8 !important;
   outline-offset: 2px;
 }
 

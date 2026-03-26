@@ -51,7 +51,7 @@ const translations: Translations = {
     es: 'Español',
   },
   welcomeMessage: {
-    en: 'Hello! I\'m Vecinita, your environmental and community information assistant. I can help you find information about environmental and community topics. Ask me anything!',
+    en: "Hello! I'm Vecinita, your environmental and community information assistant. I can help you find information about environmental and community topics. Ask me anything!",
     es: '¡Hola! Soy Vecinita, tu asistente de información ambiental y comunitaria. Puedo ayudarte a encontrar información sobre temas ambientales y comunitarios. ¡Pregúntame lo que quieras!',
   },
   newChat: {

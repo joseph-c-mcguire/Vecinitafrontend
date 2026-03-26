@@ -125,7 +125,9 @@ describe('LanguageContext', () => {
       expect(result.current.t('appTitle')).toBe('Vecinita');
       expect(result.current.t('sendMessage')).toBe('Enviar mensaje');
       expect(result.current.t('typePlaceholder')).toBe('Escribe tu pregunta...');
-      expect(result.current.t('adminTagsPlaceholder')).toBe('Etiquetas (separadas por comas, opcional)');
+      expect(result.current.t('adminTagsPlaceholder')).toBe(
+        'Etiquetas (separadas por comas, opcional)'
+      );
       expect(result.current.t('adminTitle')).toBe('Administración');
       expect(result.current.t('adminTabQueue')).toBe('Cola');
     });

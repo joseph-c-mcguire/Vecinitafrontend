@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured, supabaseConfigError } from '@/lib/supabase';
 
-const DEV_ADMIN_ENABLED = (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
+const DEV_ADMIN_ENABLED =
+  (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
 const DEV_ADMIN_EMAIL = import.meta.env.VITE_DEV_ADMIN_EMAIL || '';
 const DEV_ADMIN_PASSWORD = import.meta.env.VITE_DEV_ADMIN_PASSWORD || '';
 const DEV_ADMIN_TOKEN = import.meta.env.VITE_DEV_ADMIN_TOKEN || '';
@@ -91,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ) {
         localStorage.setItem(
           DEV_ADMIN_STORAGE_KEY,
-          JSON.stringify({ email: DEV_ADMIN_EMAIL, token: DEV_ADMIN_TOKEN }),
+          JSON.stringify({ email: DEV_ADMIN_EMAIL, token: DEV_ADMIN_TOKEN })
         );
         setUser(createDevAdminUser(DEV_ADMIN_EMAIL));
         setSession(null);

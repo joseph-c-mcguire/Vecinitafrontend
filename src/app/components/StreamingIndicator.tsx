@@ -15,10 +15,7 @@ interface StreamingIndicatorProps {
   className?: string;
 }
 
-export function StreamingIndicator({
-  message,
-  className = '',
-}: StreamingIndicatorProps) {
+export function StreamingIndicator({ message, className = '' }: StreamingIndicatorProps) {
   const { t } = useLanguage();
 
   return (
@@ -30,14 +27,8 @@ export function StreamingIndicator({
     >
       <Loader2 className="h-5 w-5 animate-spin text-primary mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground mb-1">
-          {t('assistant.thinking')}
-        </p>
-        {message && (
-          <p className="text-sm text-muted-foreground break-words">
-            {message}
-          </p>
-        )}
+        <p className="text-sm font-medium text-foreground mb-1">{t('assistant.thinking')}</p>
+        {message && <p className="text-sm text-muted-foreground break-words">{message}</p>}
       </div>
     </Card>
   );

@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { supabase } from '@/lib/supabase';
 
 // Mock contexts and services
 vi.mock('@/lib/supabase');
@@ -38,14 +37,8 @@ describe('Chat Interface Integration Tests', () => {
     render(
       <MockProviders>
         <div>
-          <input
-            data-testid="message-input"
-            placeholder="Escribe tu pregunta..."
-          />
-          <button
-            data-testid="send-button"
-            onClick={mockSendMessage}
-          >
+          <input data-testid="message-input" placeholder="Escribe tu pregunta..." />
+          <button data-testid="send-button" onClick={mockSendMessage}>
             Enviar
           </button>
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ThumbsUp, ThumbsDown, MessageSquare, X } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -17,7 +17,11 @@ interface MessageFeedbackProps {
   initialFeedback?: Feedback;
 }
 
-export function MessageFeedback({ messageId, onFeedbackSubmit, initialFeedback }: MessageFeedbackProps) {
+export function MessageFeedback({
+  messageId,
+  onFeedbackSubmit,
+  initialFeedback,
+}: MessageFeedbackProps) {
   const { language } = useLanguage();
   const [rating, setRating] = useState<FeedbackRating>(initialFeedback?.rating || null);
   const [showCommentBox, setShowCommentBox] = useState(false);
@@ -27,14 +31,14 @@ export function MessageFeedback({ messageId, onFeedbackSubmit, initialFeedback }
   const handleRatingClick = (newRating: 'positive' | 'negative') => {
     const finalRating = rating === newRating ? null : newRating;
     setRating(finalRating);
-    
+
     if (finalRating) {
       setShowCommentBox(true);
     } else {
       setShowCommentBox(false);
       setComment('');
       setIsSubmitted(false);
-      
+
       // Submit removal of feedback
       if (onFeedbackSubmit) {
         onFeedbackSubmit({
@@ -127,10 +131,11 @@ export function MessageFeedback({ messageId, onFeedbackSubmit, initialFeedback }
       {showCommentBox && (
         <div className="bg-accent/50 border border-border rounded-lg p-3 space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-start justify-between gap-2">
-            <label htmlFor={`feedback-comment-${messageId}`} className="text-xs font-medium text-foreground">
-              {language === 'es' 
-                ? '¿Qué podríamos mejorar?' 
-                : 'What could we improve?'}
+            <label
+              htmlFor={`feedback-comment-${messageId}`}
+              className="text-xs font-medium text-foreground"
+            >
+              {language === 'es' ? '¿Qué podríamos mejorar?' : 'What could we improve?'}
             </label>
             <button
               onClick={handleCommentCancel}
@@ -153,9 +158,7 @@ export function MessageFeedback({ messageId, onFeedbackSubmit, initialFeedback }
             maxLength={500}
           />
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">
-              {comment.length}/500
-            </span>
+            <span className="text-xs text-muted-foreground">{comment.length}/500</span>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleCommentCancel}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
@@ -34,7 +34,7 @@ function AppShell() {
   useEffect(() => {
     document.documentElement.classList.toggle(
       'screen-reader-active',
-      !!accessibilitySettings.screenReader,
+      !!accessibilitySettings.screenReader
     );
   }, [accessibilitySettings.screenReader]);
 
@@ -42,8 +42,14 @@ function AppShell() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
-      if (e.key === 'a') { e.preventDefault(); setIsAccessibilityOpen(true); }
-      if (e.key === 'k') { e.preventDefault(); setIsKeyboardShortcutsOpen(true); }
+      if (e.key === 'a') {
+        e.preventDefault();
+        setIsAccessibilityOpen(true);
+      }
+      if (e.key === 'k') {
+        e.preventDefault();
+        setIsKeyboardShortcutsOpen(true);
+      }
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
@@ -52,7 +58,11 @@ function AppShell() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <SkipToContent />
-      <NavBar theme={theme} setTheme={setTheme} onOpenAccessibility={() => setIsAccessibilityOpen(true)} />
+      <NavBar
+        theme={theme}
+        setTheme={setTheme}
+        onOpenAccessibility={() => setIsAccessibilityOpen(true)}
+      />
       <div className="flex-1 flex flex-col" id="main-content" tabIndex={-1}>
         <Routes>
           <Route path="/" element={<ChatPage />} />
@@ -65,7 +75,10 @@ function AppShell() {
       </div>
 
       {isAccessibilityOpen && (
-        <AccessibilityPanel isOpen={isAccessibilityOpen} onClose={() => setIsAccessibilityOpen(false)} />
+        <AccessibilityPanel
+          isOpen={isAccessibilityOpen}
+          onClose={() => setIsAccessibilityOpen(false)}
+        />
       )}
       {isKeyboardShortcutsOpen && (
         <KeyboardShortcutsHelp onClose={() => setIsKeyboardShortcutsOpen(false)} />
@@ -91,4 +104,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-

@@ -1,10 +1,10 @@
 /**
  * Tests for StreamingIndicator component
- * 
+ *
  * Tests visual indicators for agent thinking/processing states.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { StreamingIndicator, TypingIndicator } from '../StreamingIndicator';
 import { LanguageProvider } from '../../context/LanguageContext';
@@ -39,9 +39,7 @@ beforeEach(() => {
 });
 
 const LanguageWrapper = ({ children }: { children: React.ReactNode }) => (
-  <LanguageProvider>
-    {children}
-  </LanguageProvider>
+  <LanguageProvider>{children}</LanguageProvider>
 );
 
 describe('StreamingIndicator', () => {
@@ -156,7 +154,7 @@ describe('TypingIndicator', () => {
     const { container } = render(<TypingIndicator />);
 
     const dots = container.querySelectorAll('.animate-bounce');
-    
+
     expect(dots[0]).toHaveStyle({ animationDelay: '0ms' });
     expect(dots[1]).toHaveStyle({ animationDelay: '150ms' });
     expect(dots[2]).toHaveStyle({ animationDelay: '300ms' });

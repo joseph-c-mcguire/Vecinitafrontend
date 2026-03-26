@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import App from '../../App';
 
 /**
@@ -11,7 +11,7 @@ describe('App Component - Integration Tests', () => {
     // Clear localStorage before each test
     localStorage.clear();
     vi.clearAllMocks();
-    
+
     // Mock scrollIntoView since jsdom doesn't support it
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -26,7 +26,7 @@ describe('App Component - Integration Tests', () => {
   it('should not reference any deleted components', async () => {
     // Verify by checking that the core components import successfully
     render(<App />);
-    
+
     // Wait for async provider initialization to complete
     await waitFor(() => {
       expect(document.body).toBeInTheDocument();
@@ -60,11 +60,10 @@ describe('App Component - Dependencies Verification', () => {
 
   it('should have all required components available for import', async () => {
     const components = await import('../index');
-    
+
     expect(components.ChatWidget).toBeDefined();
     expect(components.AccessibilityPanel).toBeDefined();
     expect(components.LanguageSelector).toBeDefined();
     expect(components.ThemeToggle).toBeDefined();
   });
 });
-

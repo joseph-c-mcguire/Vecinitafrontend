@@ -85,7 +85,7 @@ describe('Component Exports - index.ts', () => {
   it('should NOT export BackendSettingsPanel', async () => {
     const exports = await import('../index');
 
-    expect(exports.BackendSettingsPanel).toBeUndefined();
+    expect((exports as Record<string, unknown>).BackendSettingsPanel).toBeUndefined();
   });
 });
 
@@ -112,9 +112,9 @@ describe('Deleted Components - Should Not Exist', () => {
       try {
         await import(`../${componentName}.tsx`);
         throw new Error(`${componentName} should have been deleted but was found`);
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Expected: module not found
-        if (error.message.includes('should have been deleted')) {
+        if (error instanceof Error && error.message.includes('should have been deleted')) {
           throw error;
         }
         expect(error).toBeDefined();
@@ -187,4 +187,3 @@ describe('UI Component Dependencies - Core Files', () => {
     expect(module.Card).toBeDefined();
   });
 });
-

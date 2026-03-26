@@ -60,7 +60,10 @@ export function useFocusReturn() {
 
     return () => {
       // Restaurar el foco al cerrar
-      if (previousActiveElement.current && typeof previousActiveElement.current.focus === 'function') {
+      if (
+        previousActiveElement.current &&
+        typeof previousActiveElement.current.focus === 'function'
+      ) {
         previousActiveElement.current.focus();
       }
     };

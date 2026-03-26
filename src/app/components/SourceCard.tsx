@@ -1,4 +1,3 @@
-import React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Card } from './ui/card';
 
@@ -32,7 +31,10 @@ export function SourceCard({ source, index }: SourceCardProps) {
               <h4 className="line-clamp-2 text-xs text-foreground transition-colors group-hover:text-primary sm:text-sm">
                 {source.title}
               </h4>
-              <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground sm:h-4 sm:w-4" aria-hidden="true" />
+              <ExternalLink
+                className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground sm:h-4 sm:w-4"
+                aria-hidden="true"
+              />
             </div>
             {source.snippet && (
               <p className="mt-1 line-clamp-2 text-[10px] text-muted-foreground sm:text-xs">
