@@ -1,10 +1,9 @@
-import { defineConfig } from 'vite'
-import path from 'path'
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
+import path from 'path';
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
 
-const gatewayProxyTarget =
-  process.env.VITE_GATEWAY_PROXY_TARGET || 'http://127.0.0.1:8004'
+const gatewayProxyTarget = process.env.VITE_GATEWAY_PROXY_TARGET || 'http://127.0.0.1:8004';
 
 export default defineConfig({
   plugins: [
@@ -25,9 +24,8 @@ export default defineConfig({
       '/api': {
         target: gatewayProxyTarget,
         changeOrigin: true,
-        rewrite: (path) =>
-          path.startsWith('/api/v1/') ? path : path.replace(/^\/api/, '/api/v1'),
+        rewrite: (path) => (path.startsWith('/api/v1/') ? path : path.replace(/^\/api/, '/api/v1')),
       },
     },
   },
-})
+});

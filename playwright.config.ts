@@ -20,14 +20,15 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: process.env.E2E_SKIP_WEBSERVER === 'true'
-    ? undefined
-    : {
-        command: `npm run dev -- --host ${host} --port ${port}`,
-        url: baseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 180_000,
-      },
+  webServer:
+    process.env.E2E_SKIP_WEBSERVER === 'true'
+      ? undefined
+      : {
+          command: `npm run dev -- --host ${host} --port ${port}`,
+          url: baseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+        },
   projects: [
     {
       name: 'chromium',

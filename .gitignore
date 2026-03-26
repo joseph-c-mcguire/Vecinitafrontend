@@ -30,6 +30,7 @@ yarn-error.log*
 *.swp
 *.swo
 *~
+*.tsbuildinfo
 
 # vite
 .vite/

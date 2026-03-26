@@ -3,9 +3,14 @@
 ## Setup
 
 ```bash
-cd frontend
-npm install
+cd frontend && npm install
+
+# Start only the frontend
 npm run dev
+
+# Or use the root command surface from the repo root
+cd ..
+make dev-frontend
 ```
 
 The app will be available at `http://localhost:5173`
@@ -23,8 +28,8 @@ Before you start, check out the documentation:
 ## Testing
 
 ```bash
-# All tests
-npm test
+# Unit tests
+npm run test:unit
 
 # Watch mode
 npm run test:watch
@@ -34,6 +39,13 @@ npm run test:coverage
 
 # UI mode
 npm run test:ui
+
+# End-to-end tests
+npm run test:e2e
+
+# Root shortcuts from repo root
+make test-frontend-unit
+make test-frontend-e2e
 ```
 
 ## Code Standards
@@ -41,12 +53,31 @@ npm run test:ui
 ### Prettier (Formatter)
 ```bash
 npm run format
+npm run format:write
 ```
 
 ### ESLint (Linter)
 ```bash
 npm run lint
 npm run lint:fix
+```
+
+### TypeScript
+```bash
+npm run typecheck
+```
+
+## Root Makefile Shortcuts
+
+From the repository root you can use:
+
+```bash
+make dev-frontend
+make lint-frontend
+make typecheck-frontend
+make format-frontend
+make test-frontend-unit
+make test-frontend-e2e
 ```
 
 ## Project Structure
