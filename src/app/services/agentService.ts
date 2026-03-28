@@ -131,10 +131,7 @@ export class AgentServiceError extends Error {
   }
 }
 
-async function parseJsonResponseOrThrow<T>(
-  response: Response,
-  endpointLabel: string
-): Promise<T> {
+async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: string): Promise<T> {
   const contentType = response.headers?.get?.('content-type')?.toLowerCase() || '';
   const hasContentType = contentType.length > 0;
   const looksJson = contentType.includes('application/json');
