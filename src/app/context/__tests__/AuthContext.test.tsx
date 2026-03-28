@@ -6,7 +6,7 @@ const STORAGE_KEY = 'vecinita-dev-admin-session';
 
 type SupabaseMockOptions = {
   configured: boolean;
-  session?: any;
+  session?: unknown;
   signInError?: Error | null;
   signUpError?: Error | null;
 };

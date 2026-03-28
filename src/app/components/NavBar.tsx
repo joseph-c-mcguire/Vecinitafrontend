@@ -1,12 +1,10 @@
 /**
- * NavBar — top navigation with Chat, Documents, and (admin-only) Admin tabs.
+ * NavBar — top navigation with Chat and Documents tabs.
  * Uses React Router NavLink for active-tab highlighting.
- * No auth state is read here — the parent route handles guards.
  */
 
-import { Link, NavLink } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { MessageSquare, BookOpen, Settings } from 'lucide-react';
-import { useAuth } from '../context/AuthContext';
 import { LanguageSelector } from './LanguageSelector';
 import { ThemeToggle } from './ThemeToggle';
 
@@ -17,8 +15,6 @@ interface NavBarProps {
 }
 
 export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps) {
-  const { isAdmin, user, signOut } = useAuth();
-
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     [
       'flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
@@ -43,12 +39,6 @@ export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps) {
             <BookOpen size={16} />
             Documents
           </NavLink>
-          {isAdmin && (
-            <NavLink to="/admin" className={linkClass}>
-              <Settings size={16} />
-              Admin
-            </NavLink>
-          )}
         </nav>
 
         {/* Right controls */}
@@ -65,21 +55,6 @@ export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps) {
             </button>
           )}
           <ThemeToggle theme={theme} setTheme={setTheme} />
-          {user ? (
-            <button
-              onClick={() => signOut()}
-              className="px-3 py-1.5 text-xs rounded-md border hover:bg-accent transition-colors"
-            >
-              Sign out
-            </button>
-          ) : (
-            <Link
-              to="/login?redirect=%2Fadmin"
-              className="px-3 py-1.5 text-xs rounded-md border hover:bg-accent transition-colors"
-            >
-              Admin login
-            </Link>
-          )}
         </div>
       </div>
     </header>
