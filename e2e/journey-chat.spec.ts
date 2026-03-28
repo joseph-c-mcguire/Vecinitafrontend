@@ -1,12 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
-async function submitMainChatQuestion(page: Page, question: string) {
+async function submitMainChatQuestion(page: Page, question: string): Promise<void> {
   const composer = page.locator('main textarea').first();
   await composer.fill(question);
   await composer.press('Enter');
 }
 
-async function installChatConfigFixture(page: Page) {
+async function installChatConfigFixture(page: Page): Promise<void> {
   await page.route('**/ask/config**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -21,7 +21,7 @@ async function installChatConfigFixture(page: Page) {
   });
 }
 
-async function installDoctorJourneyStream(page: Page) {
+async function installDoctorJourneyStream(page: Page): Promise<void> {
   await page.route('**/ask/stream**', async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 300));
     const body = [
@@ -67,7 +67,7 @@ async function installDoctorJourneyStream(page: Page) {
   });
 }
 
-async function installClarificationJourneyStream(page: Page) {
+async function installClarificationJourneyStream(page: Page): Promise<void> {
   await page.route('**/ask/stream**', async (route) => {
     const requestUrl = new URL(route.request().url());
     const clarificationResponse = requestUrl.searchParams.get('clarification_response');
@@ -129,7 +129,7 @@ async function installClarificationJourneyStream(page: Page) {
   });
 }
 
-async function installUnsafeContentJourneyStream(page: Page) {
+async function installUnsafeContentJourneyStream(page: Page): Promise<void> {
   await page.route('**/ask/stream**', async (route) => {
     await route.fulfill({
       status: 200,

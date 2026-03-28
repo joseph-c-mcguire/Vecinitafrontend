@@ -19,7 +19,7 @@ test.describe('Admin authentication and ingestion', () => {
     page,
   }) => {
     const cleanupSourceUrls = new Set<string>();
-    const maybeSkipForInfraConstraint = async () => {
+    const maybeSkipForInfraConstraint = async (): Promise<void> => {
       const adminError = page.getByText(/Admin API error/i).first();
       const visible = await adminError.isVisible().catch(() => false);
       if (!visible) return;

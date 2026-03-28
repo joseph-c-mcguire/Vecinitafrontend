@@ -8,7 +8,7 @@ const adminPassword = process.env.E2E_ADMIN_PASSWORD || process.env.VITE_DEV_ADM
 const nonAdminEmail = process.env.E2E_NON_ADMIN_EMAIL;
 const nonAdminPassword = process.env.E2E_NON_ADMIN_PASSWORD;
 
-async function loginAsAdmin(page: Page) {
+async function loginAsAdmin(page: Page): Promise<void> {
   await page.goto('/login?redirect=/admin');
   await page.getByLabel('Email').fill(adminEmail!);
   await page.getByLabel('Password').fill(adminPassword!);

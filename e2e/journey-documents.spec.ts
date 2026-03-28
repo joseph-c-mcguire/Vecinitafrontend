@@ -23,7 +23,7 @@ const journeySources = [
   },
 ];
 
-async function installDocumentsFixtures(page: Page) {
+async function installDocumentsFixtures(page: Page): Promise<void> {
   await page.route('**/documents/overview**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -67,7 +67,7 @@ async function installDocumentsFixtures(page: Page) {
   });
 }
 
-async function installWindowOpenRecorder(page: Page) {
+async function installWindowOpenRecorder(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const openedUrls: string[] = [];
     (window as typeof window & { __openedUrls?: string[] }).__openedUrls = openedUrls;
@@ -78,13 +78,13 @@ async function installWindowOpenRecorder(page: Page) {
   });
 }
 
-async function readOpenedUrls(page: Page) {
+async function readOpenedUrls(page: Page): Promise<string[]> {
   return page.evaluate(() =>
     ((window as typeof window & { __openedUrls?: string[] }).__openedUrls ?? []).slice()
   );
 }
 
-async function ensureDocumentsAvailable(page: Page) {
+async function ensureDocumentsAvailable(page: Page): Promise<{ sources?: unknown[] } | null> {
   const docsResponse = await page.request.get('/api/v1/documents/overview');
   if (!docsResponse.ok()) {
     test.skip(true, 'Documents endpoint is not available');

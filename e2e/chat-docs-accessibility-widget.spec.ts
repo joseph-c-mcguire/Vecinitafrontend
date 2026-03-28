@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-async function installCommunityFixtures(page: import('@playwright/test').Page) {
+async function installCommunityFixtures(page: import('@playwright/test').Page): Promise<void> {
   await page.route('**/documents/overview**', async (route) => {
     await route.fulfill({
       status: 200,
