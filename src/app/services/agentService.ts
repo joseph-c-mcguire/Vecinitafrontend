@@ -19,16 +19,27 @@ function resolveGatewayUrl(rawUrl: string): string {
     return rawUrl;
   }
 
+  const trimmedUrl = (rawUrl || '').trim();
   const currentHost = window.location.hostname;
   const isCurrentHostLocal =
     currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
 
+  // On hosted environments, a relative /api URL can hit the static frontend server
+  // (returning HTML) instead of the agent API. Infer agent host on Render domains.
+  if (!isCurrentHostLocal && trimmedUrl.startsWith('/')) {
+    if (currentHost.endsWith('.onrender.com') && currentHost.includes('-frontend')) {
+      const inferredAgentHost = currentHost.replace('-frontend', '-agent');
+      return `${window.location.protocol}//${inferredAgentHost}${trimmedUrl}`;
+    }
+    return trimmedUrl;
+  }
+
   if (isCurrentHostLocal) {
-    return rawUrl;
+    return trimmedUrl;
   }
 
   try {
-    const parsed = new URL(rawUrl);
+    const parsed = new URL(trimmedUrl);
     const isConfiguredLocal =
       parsed.hostname === 'localhost' ||
       parsed.hostname === '127.0.0.1' ||
@@ -41,10 +52,10 @@ function resolveGatewayUrl(rawUrl: string): string {
       return parsed.toString();
     }
   } catch {
-    return rawUrl;
+    return trimmedUrl;
   }
 
-  return rawUrl;
+  return trimmedUrl;
 }
 
 // Timeout configurations
@@ -120,6 +131,34 @@ export class AgentServiceError extends Error {
   }
 }
 
+async function parseJsonResponseOrThrow<T>(
+  response: Response,
+  endpointLabel: string
+): Promise<T> {
+  const contentType = response.headers?.get?.('content-type')?.toLowerCase() || '';
+  const hasContentType = contentType.length > 0;
+  const looksJson = contentType.includes('application/json');
+
+  if (hasContentType && !looksJson) {
+    throw new AgentServiceError(
+      `${endpointLabel} returned non-JSON response (content-type: ${contentType || 'unknown'}). ` +
+        'This usually indicates a gateway URL/proxy misconfiguration.',
+      response.status,
+      'INVALID_RESPONSE_FORMAT'
+    );
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new AgentServiceError(
+      `${endpointLabel} returned malformed JSON. This usually indicates a gateway URL/proxy misconfiguration.`,
+      response.status,
+      'INVALID_JSON'
+    );
+  }
+}
+
 class AgentServiceClient {
   private baseUrl: string;
 
@@ -191,7 +230,7 @@ class AgentServiceClient {
         throw new AgentServiceError(`Agent request failed: ${errorText}`, response.status);
       }
 
-      return await response.json();
+      return await parseJsonResponseOrThrow<AgentResponse>(response, '/ask');
     } catch (error) {
       clearTimeout(timeoutId);
 
@@ -369,7 +408,7 @@ class AgentServiceClient {
           throw new AgentServiceError('Failed to fetch agent configuration', response.status);
         }
 
-        return await response.json();
+        return await parseJsonResponseOrThrow<AgentConfig>(response, '/ask/config');
       } catch (error) {
         lastError = error;
         const isLastAttempt = attempt === CONFIG_RETRY_ATTEMPTS;

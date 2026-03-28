@@ -217,6 +217,33 @@ describe('AgentServiceClient', () => {
       locationSpy.mockRestore();
     });
 
+    it('should infer Render agent host when configured with relative /api path', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
+        },
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await renderClient.ask({ question: 'hello' });
+
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
+      expect(callUrl).toContain('https://vecinita-agent.onrender.com/api/v1/ask');
+      expect(callUrl).toContain('question=hello');
+
+      locationSpy.mockRestore();
+    });
+
     it('should handle HTTP error', async () => {
       vi.mocked(fetch).mockResolvedValueOnce({
         ok: false,
@@ -251,6 +278,22 @@ describe('AgentServiceClient', () => {
       vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Network error'));
 
       await expect(client.ask({ question: 'test' })).rejects.toThrow(AgentServiceError);
+    });
+
+    it('should surface clear error when /ask returns HTML instead of JSON', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null,
+        },
+        json: async () => ({}) as AgentResponse,
+      } as Response);
+
+      await expect(client.ask({ question: 'test' })).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+      });
     });
   });
 
@@ -455,6 +498,23 @@ describe('AgentServiceClient', () => {
 
       expect(result).toEqual(mockConfig);
       expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should fail fast with clear error when config endpoint returns HTML', async () => {
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null,
+        },
+        json: async () => ({}),
+      } as Response);
+
+      await expect(client.getConfig()).rejects.toMatchObject({
+        code: 'INVALID_RESPONSE_FORMAT',
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
     });
   });
 
