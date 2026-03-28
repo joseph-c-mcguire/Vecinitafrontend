@@ -8,7 +8,7 @@ interface AccessibilityPanelProps {
   onClose: () => void;
 }
 
-export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps) {
+export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps): JSX.Element | null {
   const { t } = useLanguage();
   const {
     settings,
@@ -23,7 +23,7 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
   React.useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
@@ -31,7 +31,7 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return (): void => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;

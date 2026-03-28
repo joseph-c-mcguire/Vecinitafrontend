@@ -17,7 +17,7 @@ interface ChatMessageProps {
   onFeedbackSubmit?: (feedback: Feedback) => void;
 }
 
-export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
+export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps): JSX.Element {
   const { t } = useLanguage();
   const { settings, speak } = useAccessibility();
   const isUser = message.role === 'user';
@@ -39,7 +39,7 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
       }
     : undefined;
 
-  const handleTextClick = () => {
+  const handleTextClick = (): void => {
     if (settings.screenReader) {
       speak(message.content);
     }

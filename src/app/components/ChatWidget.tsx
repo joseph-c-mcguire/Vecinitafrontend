@@ -67,7 +67,7 @@ export function ChatWidget({
   title,
   themeMode = 'auto',
   zIndex = 1000,
-}: ChatWidgetProps) {
+}: ChatWidgetProps): JSX.Element {
   const { t, language } = useLanguage();
   const { selectedLLM } = useBackendSettings();
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -110,7 +110,7 @@ export function ChatWidget({
     }
   }, [theme, themeMode]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
@@ -125,7 +125,7 @@ export function ChatWidget({
     }
   };
 
-  const handleFeedbackSubmit = (feedback: Feedback) => {
+  const handleFeedbackSubmit = (feedback: Feedback): void => {
     // Store feedback in localStorage
     const storedFeedback = localStorage.getItem('vecinita_widget_feedback');
     const feedbackData = storedFeedback ? JSON.parse(storedFeedback) : {};
@@ -137,14 +137,14 @@ export function ChatWidget({
     localStorage.setItem('vecinita_widget_feedback', JSON.stringify(feedbackData));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
   };
 
-  const handleRetry = () => {
+  const handleRetry = (): void => {
     retryLastMessage();
   };
 

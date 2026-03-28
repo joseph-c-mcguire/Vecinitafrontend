@@ -14,7 +14,7 @@ import LoginPage from './pages/LoginPage';
 
 // ── Shell — theme + accessibility overlays ─────────────────────────────────
 
-function AppShell() {
+function AppShell(): JSX.Element {
   const { settings: accessibilitySettings } = useAccessibility();
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('vecinita-theme');
@@ -39,7 +39,7 @@ function AppShell() {
 
   // Global keyboard shortcuts
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
+    const handler = (e: KeyboardEvent): void => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       if (e.key === 'a') {
         e.preventDefault();
@@ -51,7 +51,7 @@ function AppShell() {
       }
     };
     document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    return (): void => document.removeEventListener('keydown', handler);
   }, []);
 
   return (
@@ -87,7 +87,7 @@ function AppShell() {
 
 // ── Root export ─────────────────────────────────────────────────────────────
 
-export default function App() {
+export default function App(): JSX.Element {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <LanguageProvider>
