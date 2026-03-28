@@ -50,6 +50,8 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
       className={cn('flex gap-2 p-3 sm:gap-3 sm:p-4', !isUser && 'bg-muted/30')}
       role="article"
       aria-label={`${isUser ? 'User' : 'Assistant'} message`}
+      data-testid="chat-message"
+      data-message-role={message.role}
     >
       <div
         className={cn(

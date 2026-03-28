@@ -96,6 +96,34 @@ describe('ChatPage', () => {
     expect(screen.getByTestId('chat-widget')).toBeInTheDocument();
   });
 
+  it('renders existing conversation messages and hides the welcome state', () => {
+    vi.mocked(useAgentChat).mockReturnValue(
+      createHookState({
+        messages: [
+          {
+            id: 'user-1',
+            role: 'user',
+            content: 'Can you help me find a doctor?',
+            timestamp: new Date(),
+          },
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Here are a few clinics near you.',
+            timestamp: new Date(),
+          },
+        ],
+      })
+    );
+
+    render(<ChatPage />);
+
+    expect(screen.getAllByTestId('chat-message')).toHaveLength(2);
+    expect(screen.getByText('Can you help me find a doctor?')).toBeInTheDocument();
+    expect(screen.getByText('Here are a few clinics near you.')).toBeInTheDocument();
+    expect(screen.queryByText('Welcome to Vecinita')).not.toBeInTheDocument();
+  });
+
   it('sends a message from submit button and clears textarea', async () => {
     const user = userEvent.setup();
     render(<ChatPage />);
@@ -197,6 +225,22 @@ describe('ChatPage', () => {
     expect(screen.queryByText(/Connecting\s*·/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^Waiting$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/⏳/)).not.toBeInTheDocument();
+  });
+
+  it('prefers the active streaming message over older progress hints', () => {
+    vi.mocked(useAgentChat).mockReturnValue({
+      ...createHookState(),
+      isLoading: true,
+      streamingMessage: 'Looking through local clinic resources...',
+      progressMessages: ['Connecting', 'Searching'],
+    });
+
+    render(<ChatPage />);
+
+    expect(screen.getByTestId('streaming-indicator')).toHaveTextContent(
+      'Looking through local clinic resources...'
+    );
+    expect(screen.queryByText('Searching')).not.toBeInTheDocument();
   });
 
   it('renders error and retries last message when clicking Retry', async () => {

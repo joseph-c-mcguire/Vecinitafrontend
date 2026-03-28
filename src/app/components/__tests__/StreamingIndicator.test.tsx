@@ -85,6 +85,18 @@ describe('StreamingIndicator', () => {
     expect(indicator).toHaveAttribute('aria-live', 'polite');
   });
 
+  it('should expose a stable test id and accessible label', () => {
+    render(
+      <LanguageWrapper>
+        <StreamingIndicator />
+      </LanguageWrapper>
+    );
+
+    const indicator = screen.getByTestId('streaming-indicator');
+    expect(indicator).toHaveAttribute('role', 'status');
+    expect(indicator).toHaveAttribute('aria-label', 'Assistant is thinking...');
+  });
+
   it('should apply custom className', () => {
     const { container } = render(
       <LanguageWrapper>

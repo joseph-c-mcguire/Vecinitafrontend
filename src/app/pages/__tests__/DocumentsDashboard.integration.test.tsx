@@ -37,6 +37,7 @@ vi.mock('../../context/LanguageContext', () => ({
 describe('DocumentsDashboard integration', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.stubGlobal('alert', vi.fn());
 
     vi.stubGlobal(
       'fetch',
@@ -108,6 +109,31 @@ describe('DocumentsDashboard integration', () => {
     expect(screen.queryByText('Download')).not.toBeInTheDocument();
   });
 
+  it('renders an error state when the documents request fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve({ ok: false, status: 503 } as Response);
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve({ ok: true, json: async () => ({ tags: [] }) } as Response);
+        }
+
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to load resources: HTTP 503')).toBeInTheDocument();
+    });
+  });
+
   it('supports topic filtering and renders actionable source links', async () => {
     const user = userEvent.setup();
 
@@ -127,5 +153,263 @@ describe('DocumentsDashboard integration', () => {
     const openSourceLink = screen.getByRole('link', { name: 'Open source' });
     expect(openSourceLink).toHaveAttribute('href', 'https://example.org/b');
     expect(openSourceLink).toHaveAttribute('target', '_blank');
+  });
+
+  it('renders open-source actions only for external http resources', async () => {
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Example Source A')).toBeInTheDocument();
+    });
+
+    expect(screen.getAllByRole('link', { name: 'Open source' })).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Download' })).not.toBeInTheDocument();
+  });
+
+  it('resolves document download links and opens them in a new tab', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              sources: [
+                {
+                  url: 'stored/clinic-flyer.pdf',
+                  title: 'Clinic Flyer',
+                  source_domain: 'storage',
+                  tags: ['health'],
+                  downloadable: true,
+                },
+              ],
+            }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/download-url')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              download_url: 'https://downloads.example.org/clinic-flyer.pdf',
+            }),
+          } as Response);
+        }
+
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Clinic Flyer')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Download' }));
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        'https://downloads.example.org/clinic-flyer.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+  });
+
+  it('uses an existing download_url without requesting a new one', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const fetchSpy = vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+
+      if (url.includes('/documents/overview')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            sources: [
+              {
+                url: 'stored/ready-download.pdf',
+                title: 'Ready Download',
+                source_domain: 'storage',
+                tags: ['health'],
+                download_url: 'https://downloads.example.org/ready-download.pdf',
+              },
+            ],
+          }),
+        } as Response);
+      }
+
+      if (url.includes('/documents/tags')) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
+        } as Response);
+      }
+
+      return Promise.resolve({ ok: false, status: 404 } as Response);
+    });
+
+    vi.stubGlobal('fetch', fetchSpy);
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Ready Download')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Download' }));
+
+    expect(openSpy).toHaveBeenCalledWith(
+      'https://downloads.example.org/ready-download.pdf',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(fetchSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('/documents/download-url')
+    );
+  });
+
+  it('disables the download action while resolving the download URL', async () => {
+    const user = userEvent.setup();
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    let resolveDownloadRequest: ((value: Response) => void) | undefined;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              sources: [
+                {
+                  url: 'stored/pending-download.pdf',
+                  title: 'Pending Download',
+                  source_domain: 'storage',
+                  tags: ['health'],
+                  downloadable: true,
+                },
+              ],
+            }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/download-url')) {
+          return new Promise<Response>((resolve) => {
+            resolveDownloadRequest = resolve;
+          });
+        }
+
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Pending Download')).toBeInTheDocument();
+    });
+
+    const downloadButton = screen.getByRole('button', { name: 'Download' });
+    await user.click(downloadButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: '…' })).toBeDisabled();
+    });
+
+    resolveDownloadRequest?.({
+      ok: true,
+      json: async () => ({
+        download_url: 'https://downloads.example.org/pending-download.pdf',
+      }),
+    } as Response);
+
+    await waitFor(() => {
+      expect(openSpy).toHaveBeenCalledWith(
+        'https://downloads.example.org/pending-download.pdf',
+        '_blank',
+        'noopener,noreferrer'
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Download' })).toBeEnabled();
+    });
+  });
+
+  it('alerts when download URL resolution fails', async () => {
+    const user = userEvent.setup();
+    const alertSpy = vi.mocked(globalThis.alert);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              sources: [
+                {
+                  url: 'stored/failing-download.pdf',
+                  title: 'Failing Download',
+                  source_domain: 'storage',
+                  tags: ['health'],
+                  downloadable: true,
+                },
+              ],
+            }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
+          } as Response);
+        }
+
+        if (url.includes('/documents/download-url')) {
+          return Promise.resolve({ ok: false, status: 500 } as Response);
+        }
+
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Failing Download')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Download' }));
+
+    await waitFor(() => {
+      expect(alertSpy).toHaveBeenCalledWith('Unable to resolve a download link (HTTP 500)');
+    });
   });
 });

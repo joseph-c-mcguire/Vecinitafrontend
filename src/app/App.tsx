@@ -10,7 +10,6 @@ import { SkipToContent } from './components/SkipToContent';
 import { NavBar } from './components/NavBar';
 import ChatPage from './pages/ChatPage';
 import DocumentsDashboard from './pages/DocumentsDashboard';
-import AdminDashboard from './pages/AdminDashboard';
 import LoginPage from './pages/LoginPage';
 
 // ── Shell — theme + accessibility overlays ─────────────────────────────────
@@ -68,7 +67,6 @@ function AppShell() {
           <Route path="/" element={<ChatPage />} />
           <Route path="/documents" element={<DocumentsDashboard />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/admin" element={<AdminDashboard />} />
           {/* Catch-all → chat */}
           <Route path="*" element={<ChatPage />} />
         </Routes>
