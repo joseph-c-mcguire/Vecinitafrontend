@@ -5,7 +5,7 @@ interface LanguageSelectorProps {
   variant?: 'default' | 'compact';
 }
 
-export function LanguageSelector({ variant = 'default' }: LanguageSelectorProps) {
+export function LanguageSelector({ variant = 'default' }: LanguageSelectorProps): JSX.Element {
   const { language, setLanguage, t } = useLanguage();
 
   if (variant === 'compact') {

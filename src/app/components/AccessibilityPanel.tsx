@@ -8,7 +8,10 @@ interface AccessibilityPanelProps {
   onClose: () => void;
 }
 
-export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps): JSX.Element | null {
+export function AccessibilityPanel({
+  isOpen,
+  onClose,
+}: AccessibilityPanelProps): JSX.Element | null {
   const { t } = useLanguage();
   const {
     settings,

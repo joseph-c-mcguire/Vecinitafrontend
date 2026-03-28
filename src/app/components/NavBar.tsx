@@ -14,8 +14,8 @@ interface NavBarProps {
   onOpenAccessibility?: () => void;
 }
 
-export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps) {
-  const linkClass = ({ isActive }: { isActive: boolean }) =>
+export function NavBar({ theme, setTheme, onOpenAccessibility }: NavBarProps): JSX.Element {
+  const linkClass = ({ isActive }: { isActive: boolean }): string =>
     [
       'flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors',
       isActive

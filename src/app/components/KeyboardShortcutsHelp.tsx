@@ -14,15 +14,15 @@ interface KeyboardShortcutsHelpProps {
 /**
  * Componente de ayuda de atajos de teclado
  */
-export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps) {
+export function KeyboardShortcutsHelp({ onClose }: KeyboardShortcutsHelpProps): JSX.Element {
   const { language } = useLanguage();
 
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
+    const handleEscape = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    return (): void => window.removeEventListener('keydown', handleEscape);
   }, [onClose]);
 
   const shortcuts: Shortcut[] = [
