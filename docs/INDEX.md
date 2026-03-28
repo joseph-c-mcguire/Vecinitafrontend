@@ -72,7 +72,7 @@ frontend/
 
 ## 🔗 Quick Links
 
-- **GitHub Repository:** [Vecinita Frontend](https://github.com/joseph-c-mcguire/Vecinitafrontend)
+- **GitHub Repository:** [Vecinita Frontend](https://github.com/Math-Data-Justice-Collaborative/Vecinitafrontend)
 - **Main Backend Documentation:** See root-level `/docs` folder in the Vecinita monorepo
 
 ## ❓ Additional Help
