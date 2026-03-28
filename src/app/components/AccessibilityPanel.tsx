@@ -78,11 +78,9 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                 <select
                   id="font-size-select"
                   value={settings.fontSize}
-                    onChange={(e) =>
-                      setFontSize(
-                        e.target.value as 'small' | 'medium' | 'large' | 'extra-large'
-                      )
-                    }
+                  onChange={(e) =>
+                    setFontSize(e.target.value as 'small' | 'medium' | 'large' | 'extra-large')
+                  }
                   className="w-full px-3 py-2 text-sm sm:text-base rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label={t('fontSize')}
                 >

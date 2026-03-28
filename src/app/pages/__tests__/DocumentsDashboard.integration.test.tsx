@@ -277,9 +277,7 @@ describe('DocumentsDashboard integration', () => {
       '_blank',
       'noopener,noreferrer'
     );
-    expect(fetchSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('/documents/download-url')
-    );
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/documents/download-url'));
   });
 
   it('disables the download action while resolving the download URL', async () => {

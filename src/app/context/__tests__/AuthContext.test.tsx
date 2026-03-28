@@ -36,7 +36,8 @@ async function loadAuthModule(options: SupabaseMockOptions) {
   vi.doMock('@/lib/supabase', () => ({
     isSupabaseConfigured: options.configured,
     supabase: options.configured ? supabaseMock : null,
-    supabaseConfigError: 'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
+    supabaseConfigError:
+      'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
   }));
 
   const mod = await import('../AuthContext');
@@ -207,6 +208,8 @@ describe('AuthContext', () => {
   it('throws when useAuth is called outside provider', async () => {
     const { useAuth } = await loadAuthModule({ configured: false });
 
-    expect(() => renderHook(() => useAuth())).toThrow('useAuth must be used within an AuthProvider');
+    expect(() => renderHook(() => useAuth())).toThrow(
+      'useAuth must be used within an AuthProvider'
+    );
   });
 });

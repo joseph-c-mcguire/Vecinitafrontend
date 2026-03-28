@@ -112,7 +112,8 @@ async function installClarificationJourneyStream(page: Page) {
         })}\n\n`,
         `data: ${JSON.stringify({
           type: 'complete',
-          answer: 'Thanks. In Providence, start with the [Open Door Health Clinic](https://clinic.example.org/open-door).',
+          answer:
+            'Thanks. In Providence, start with the [Open Door Health Clinic](https://clinic.example.org/open-door).',
           sources: [
             {
               title: 'Open Door Health Clinic',
@@ -213,7 +214,9 @@ test.describe('Journey Chat (J001-J008)', () => {
     const question = 'Necesito ayuda con recursos de vivienda';
     await submitMainChatQuestion(page, question);
     await expect(page.getByText(question)).toBeVisible();
-    await expect(page.locator('[data-testid="chat-message"]').first()).toBeVisible({ timeout: 45000 });
+    await expect(page.locator('[data-testid="chat-message"]').first()).toBeVisible({
+      timeout: 45000,
+    });
   });
 
   test('J007 retries after a failed request', async ({ page }) => {
@@ -221,7 +224,11 @@ test.describe('Journey Chat (J001-J008)', () => {
     await page.route('**/api/v1/ask**', async (route) => {
       askCalls += 1;
       if (askCalls === 1) {
-        await route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"forced error"}' });
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: '{"detail":"forced error"}',
+        });
         return;
       }
       await route.continue();
@@ -235,9 +242,7 @@ test.describe('Journey Chat (J001-J008)', () => {
     await expect(retryButton).toBeVisible({ timeout: 15000 });
     await retryButton.click();
 
-    await expect
-      .poll(() => askCalls, { timeout: 20000 })
-      .toBeGreaterThanOrEqual(2);
+    await expect.poll(() => askCalls, { timeout: 20000 }).toBeGreaterThanOrEqual(2);
   });
 
   test('J008 displays streaming progression before completion', async ({ page }) => {
@@ -246,8 +251,15 @@ test.describe('Journey Chat (J001-J008)', () => {
     await submitMainChatQuestion(page, question);
     await expect(page.getByText(question)).toBeVisible();
 
-    await expect(page.locator('[data-testid="streaming-indicator"]').or(page.locator('text=/Thinking|Pensando/i')).first()).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('[data-testid="chat-message"]').first()).toBeVisible({ timeout: 45000 });
+    await expect(
+      page
+        .locator('[data-testid="streaming-indicator"]')
+        .or(page.locator('text=/Thinking|Pensando/i'))
+        .first()
+    ).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('[data-testid="chat-message"]').first()).toBeVisible({
+      timeout: 45000,
+    });
   });
 
   test('doctor journey renders response, exposes links, and remains accessible', async ({
@@ -275,7 +287,9 @@ test.describe('Journey Chat (J001-J008)', () => {
     });
     await expect(streamingStatus).toBeVisible({ timeout: 15000 });
 
-    const assistantMessage = page.locator('[data-testid="chat-message"][data-message-role="assistant"]').last();
+    const assistantMessage = page
+      .locator('[data-testid="chat-message"][data-message-role="assistant"]')
+      .last();
     await expect(assistantMessage).toBeVisible({ timeout: 45000 });
     await expect(assistantMessage).toContainText('Providence Community Health Center');
 
@@ -293,7 +307,9 @@ test.describe('Journey Chat (J001-J008)', () => {
     await expect(popup).toHaveURL('https://clinic.example.org/providers');
     await popup.close();
 
-    const sourceCardLink = page.getByRole('link', { name: /Source 1: Community Clinic Directory/i });
+    const sourceCardLink = page.getByRole('link', {
+      name: /Source 1: Community Clinic Directory/i,
+    });
     await expect(sourceCardLink).toBeVisible();
 
     await page.keyboard.press('Alt+a');
@@ -335,7 +351,9 @@ test.describe('Journey Chat (J001-J008)', () => {
 
     await submitMainChatQuestion(page, 'Providence, and yes I need primary care');
 
-    const assistantMessage = page.locator('[data-testid="chat-message"][data-message-role="assistant"]').last();
+    const assistantMessage = page
+      .locator('[data-testid="chat-message"][data-message-role="assistant"]')
+      .last();
     await expect(assistantMessage).toContainText('Open Door Health Clinic', { timeout: 15000 });
 
     const clinicLink = assistantMessage.getByRole('link', {
@@ -371,7 +389,9 @@ test.describe('Journey Chat (J001-J008)', () => {
 
     await submitMainChatQuestion(page, 'Show me clinics and include links');
 
-    const assistantMessage = page.locator('[data-testid="chat-message"][data-message-role="assistant"]').first();
+    const assistantMessage = page
+      .locator('[data-testid="chat-message"][data-message-role="assistant"]')
+      .first();
     await expect(assistantMessage).toBeVisible({ timeout: 15000 });
     await expect(assistantMessage.locator('script')).toHaveCount(0);
     const safeInlineLink = assistantMessage.getByRole('link', { name: 'safe clinic', exact: true });

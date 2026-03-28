@@ -75,10 +75,13 @@ export function BackendSettingsProvider({ children }: { children: ReactNode }) {
         // Check if saved settings are valid for current config
         if (data.providers && data.providers.length > 0) {
           setSettings((prev) => {
-            const providerExists = data.providers.some((provider) => provider.name === prev.llmProvider);
+            const providerExists = data.providers.some(
+              (provider) => provider.name === prev.llmProvider
+            );
 
             if (!providerExists) {
-              const defaultProvider = data.providers.find((provider) => provider.default) || data.providers[0];
+              const defaultProvider =
+                data.providers.find((provider) => provider.default) || data.providers[0];
               return {
                 ...prev,
                 llmProvider: defaultProvider.name,

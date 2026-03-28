@@ -83,7 +83,10 @@ test.describe('Journey Admin (J017-J026)', () => {
       await page.getByRole('button', { name: /Models|Modelos/i }).click();
 
       const saveButton = page.getByRole('button', { name: /Save|Guardar/i }).first();
-      test.skip((await saveButton.count()) === 0, 'Model save UI not available in this environment');
+      test.skip(
+        (await saveButton.count()) === 0,
+        'Model save UI not available in this environment'
+      );
 
       await saveButton.click();
       await expect(page.locator('main')).toContainText(/Saved|Guardado|success|éxito/i);
@@ -92,7 +95,9 @@ test.describe('Journey Admin (J017-J026)', () => {
     test('J024 signs out and returns to public state', async ({ page }) => {
       await loginAsAdmin(page);
       await page.getByRole('button', { name: /Sign out|Cerrar sesión/i }).click();
-      await expect(page.getByRole('link', { name: /Admin login|Iniciar sesión de administrador/i })).toBeVisible();
+      await expect(
+        page.getByRole('link', { name: /Admin login|Iniciar sesión de administrador/i })
+      ).toBeVisible();
     });
   });
 
@@ -102,12 +107,17 @@ test.describe('Journey Admin (J017-J026)', () => {
     await page.getByLabel('Password').fill('invalid-password');
     await page.getByRole('button', { name: /sign in|iniciar sesión/i }).click();
 
-    await expect(page.getByText(/invalid|error|incorrect|fall[oó]/i)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/invalid|error|incorrect|fall[oó]/i)).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page).toHaveURL(/\/login/);
   });
 
   test('J026 rejects non-admin user dashboard access', async ({ page }) => {
-    test.skip(!nonAdminEmail || !nonAdminPassword, 'Set E2E_NON_ADMIN_EMAIL/PASSWORD for non-admin journey');
+    test.skip(
+      !nonAdminEmail || !nonAdminPassword,
+      'Set E2E_NON_ADMIN_EMAIL/PASSWORD for non-admin journey'
+    );
 
     await page.goto('/login?redirect=/admin');
     await page.getByLabel('Email').fill(nonAdminEmail!);

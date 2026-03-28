@@ -53,18 +53,18 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   const locale: 'en' | 'es' = language === 'es' ? 'es' : 'en';
   const copy = useMemo(
     () => ({
-    connecting: locale === 'es' ? 'Conectando con el backend...' : 'Connecting to backend...',
-    generating: locale === 'es' ? 'Generando respuesta...' : 'Generating response...',
-    clarificationNeeded: locale === 'es' ? 'Se necesita aclaración' : 'Clarification needed',
-    toolSummaryTitle: locale === 'es' ? 'Resumen de herramientas' : 'Tool Summary',
-    emptyResponse:
-      locale === 'es'
-        ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
-        : 'I could not generate a response right now. Please try again.',
-    unexpectedError:
-      locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
-    encounteredErrorPrefix:
-      locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
+      connecting: locale === 'es' ? 'Conectando con el backend...' : 'Connecting to backend...',
+      generating: locale === 'es' ? 'Generando respuesta...' : 'Generating response...',
+      clarificationNeeded: locale === 'es' ? 'Se necesita aclaración' : 'Clarification needed',
+      toolSummaryTitle: locale === 'es' ? 'Resumen de herramientas' : 'Tool Summary',
+      emptyResponse:
+        locale === 'es'
+          ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
+          : 'I could not generate a response right now. Please try again.',
+      unexpectedError:
+        locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
+      encounteredErrorPrefix:
+        locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
     }),
     [locale]
   );
@@ -74,13 +74,16 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     (import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true' ||
     (typeof window !== 'undefined' && window.localStorage.getItem('vecinita_debug_chat') === '1');
 
-  const debugLog = useCallback((message: string, data?: unknown) => {
-    if (!chatDebugEnabled) {
-      return;
-    }
+  const debugLog = useCallback(
+    (message: string, data?: unknown) => {
+      if (!chatDebugEnabled) {
+        return;
+      }
 
-    emitAgentDebugEvent('useAgentChat', message, data);
-  }, [chatDebugEnabled]);
+      emitAgentDebugEvent('useAgentChat', message, data);
+    },
+    [chatDebugEnabled]
+  );
   const [threadId, setThreadId] = useState<string>(initialThreadId || uuidv4());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);

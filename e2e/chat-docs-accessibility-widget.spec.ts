@@ -198,7 +198,10 @@ test.describe('Community flows', () => {
 
     const widgetComposer = page.locator('textarea').last();
     await widgetComposer.fill('I need housing support resources');
-    await page.getByRole('button', { name: /Send message|Enviar mensaje/i }).last().click();
+    await page
+      .getByRole('button', { name: /Send message|Enviar mensaje/i })
+      .last()
+      .click();
 
     await expect(page.getByText('I need housing support resources')).toBeVisible();
     const safeLink = page.getByRole('link', { name: 'Community Support Hub', exact: true }).last();

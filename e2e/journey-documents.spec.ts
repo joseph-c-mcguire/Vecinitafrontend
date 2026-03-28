@@ -79,8 +79,8 @@ async function installWindowOpenRecorder(page: Page) {
 }
 
 async function readOpenedUrls(page: Page) {
-  return page.evaluate(
-    () => ((window as typeof window & { __openedUrls?: string[] }).__openedUrls ?? []).slice()
+  return page.evaluate(() =>
+    ((window as typeof window & { __openedUrls?: string[] }).__openedUrls ?? []).slice()
   );
 }
 
@@ -130,7 +130,10 @@ test.describe('Journey Documents (J009-J016)', () => {
     await page.goto('/documents');
 
     const clearButton = page.getByRole('button', { name: /Clear filters|Limpiar filtros/i });
-    test.skip((await clearButton.count()) === 0, 'Clear filter control not present for this dataset');
+    test.skip(
+      (await clearButton.count()) === 0,
+      'Clear filter control not present for this dataset'
+    );
 
     await clearButton.click();
     await expect(page.locator('table tbody tr').first()).toBeVisible();
@@ -220,7 +223,9 @@ test.describe('Journey Documents (J009-J016)', () => {
     await page.getByRole('button', { name: /Clear filters|Limpiar filtros/i }).click();
     await expect(page.getByText('Benefits Handbook')).toBeVisible();
 
-    const clinicFlyerRow = page.locator('table tbody tr').filter({ hasText: 'Community Clinic Flyer' });
+    const clinicFlyerRow = page
+      .locator('table tbody tr')
+      .filter({ hasText: 'Community Clinic Flyer' });
     const benefitsRow = page.locator('table tbody tr').filter({ hasText: 'Benefits Handbook' });
     const clinicFlyerDownload = clinicFlyerRow.getByRole('button');
     const benefitsDownload = benefitsRow.getByRole('button');
