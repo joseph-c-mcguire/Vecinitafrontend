@@ -141,15 +141,12 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            headers: {
-              get: () => 'text/html; charset=utf-8',
-            },
-            json: async () => {
-              throw new SyntaxError("Unexpected token '<'");
-            },
-          } as Response);
+          return Promise.resolve(
+            new Response('<!doctype html><html><body>fallback</body></html>', {
+              status: 200,
+              headers: { 'content-type': 'text/html; charset=utf-8' },
+            })
+          );
         }
 
         if (url.includes('/documents/tags')) {
