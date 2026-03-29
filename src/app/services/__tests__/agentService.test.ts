@@ -238,8 +238,31 @@ describe('AgentServiceClient', () => {
       await renderClient.ask({ question: 'hello' });
 
       const callUrl = String(fetchMock.mock.calls[0]?.[0]);
-      expect(callUrl).toContain('https://vecinita-agent.onrender.com/api/v1/ask');
+      expect(callUrl).toContain('https://vecinita-agent.onrender.com/ask');
       expect(callUrl).toContain('question=hello');
+
+      locationSpy.mockRestore();
+    });
+
+    it('should strip gateway prefix for absolute Render agent hosts', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await renderClient.ask({ question: 'hello' });
+
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
+      expect(callUrl).toContain('https://vecinita-agent.onrender.com/ask');
+      expect(callUrl).not.toContain('/api/v1/ask');
 
       locationSpy.mockRestore();
     });

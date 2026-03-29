@@ -14,6 +14,18 @@ const GATEWAY_URL =
   import.meta.env.VITE_BACKEND_URL ||
   (import.meta.env.DEV ? '/api' : 'http://localhost:8004/api/v1');
 
+function isDirectRenderAgentHost(hostname: string): boolean {
+  return hostname.endsWith('.onrender.com') && hostname.includes('-agent');
+}
+
+function stripGatewayPrefixForDirectAgent(pathname: string): string {
+  const normalizedPath = pathname.replace(/\/+$/, '');
+  if (normalizedPath === '/api' || normalizedPath === '/api/v1') {
+    return '';
+  }
+  return normalizedPath;
+}
+
 function resolveGatewayUrl(rawUrl: string): string {
   if (typeof window === 'undefined') {
     return rawUrl;
@@ -29,7 +41,10 @@ function resolveGatewayUrl(rawUrl: string): string {
   if (!isCurrentHostLocal && trimmedUrl.startsWith('/')) {
     if (currentHost.endsWith('.onrender.com') && currentHost.includes('-frontend')) {
       const inferredAgentHost = currentHost.replace('-frontend', '-agent');
-      return `${window.location.protocol}//${inferredAgentHost}${trimmedUrl}`;
+      const inferredBasePath = isDirectRenderAgentHost(inferredAgentHost)
+        ? stripGatewayPrefixForDirectAgent(trimmedUrl)
+        : trimmedUrl;
+      return `${window.location.protocol}//${inferredAgentHost}${inferredBasePath}`;
     }
     return trimmedUrl;
   }
@@ -110,7 +125,11 @@ function normalizeApiBaseUrl(baseUrl: string): string {
   if (/^https?:\/\//i.test(normalizedInput)) {
     try {
       const parsed = new URL(normalizedInput);
-      parsed.pathname = ensureApiPrefix(parsed.pathname);
+      if (isDirectRenderAgentHost(parsed.hostname)) {
+        parsed.pathname = stripGatewayPrefixForDirectAgent(parsed.pathname);
+      } else {
+        parsed.pathname = ensureApiPrefix(parsed.pathname);
+      }
       return `${parsed.origin}${parsed.pathname}`;
     } catch {
       return normalizedInput;
