@@ -175,6 +175,90 @@ async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: st
   }
 }
 
+function normalizeAgentConfig(rawConfig: unknown): AgentConfig {
+  if (!rawConfig || typeof rawConfig !== 'object') {
+    throw new AgentServiceError('Agent config payload is malformed', 0, 'INVALID_CONFIG_PAYLOAD');
+  }
+
+  const source = rawConfig as Record<string, unknown>;
+  const modelsRecord =
+    source.models && typeof source.models === 'object' && !Array.isArray(source.models)
+      ? (source.models as Record<string, unknown>)
+      : {};
+
+  const normalizedModels: Record<string, string[]> = {};
+  for (const [providerName, providerModels] of Object.entries(modelsRecord)) {
+    if (Array.isArray(providerModels)) {
+      normalizedModels[providerName] = providerModels.filter(
+        (entry): entry is string => typeof entry === 'string'
+      );
+    }
+  }
+
+  const providersSource = Array.isArray(source.providers) ? source.providers : [];
+  const normalizedProviders: AgentConfig['providers'] = providersSource
+    .map((provider, index) => {
+      if (!provider || typeof provider !== 'object') {
+        return null;
+      }
+
+      const providerRecord = provider as Record<string, unknown>;
+      const providerName =
+        typeof providerRecord.name === 'string'
+          ? providerRecord.name
+          : typeof providerRecord.key === 'string'
+            ? providerRecord.key
+            : '';
+
+      if (!providerName) {
+        return null;
+      }
+
+      const inlineModels = Array.isArray(providerRecord.models)
+        ? providerRecord.models.filter((entry): entry is string => typeof entry === 'string')
+        : undefined;
+      const mappedModels = normalizedModels[providerName] ?? [];
+
+      return {
+        name: providerName,
+        models: inlineModels ?? mappedModels,
+        default: typeof providerRecord.default === 'boolean' ? providerRecord.default : index === 0,
+      };
+    })
+    .filter((provider): provider is AgentConfig['providers'][number] => provider !== null);
+
+  if (normalizedProviders.length === 0) {
+    for (const [providerName, providerModels] of Object.entries(normalizedModels)) {
+      normalizedProviders.push({
+        name: providerName,
+        models: providerModels,
+        default: normalizedProviders.length === 0,
+      });
+    }
+  }
+
+  if (normalizedProviders.length === 0) {
+    throw new AgentServiceError(
+      'Agent config payload has no providers',
+      0,
+      'INVALID_CONFIG_PAYLOAD'
+    );
+  }
+
+  return {
+    providers: normalizedProviders,
+    models: normalizedModels,
+    defaultProvider:
+      typeof source.defaultProvider === 'string'
+        ? source.defaultProvider
+        : normalizedProviders[0]?.name,
+    defaultModel:
+      typeof source.defaultModel === 'string'
+        ? source.defaultModel
+        : normalizedProviders[0]?.models[0],
+  };
+}
+
 class AgentServiceClient {
   private baseUrl: string;
 
@@ -441,7 +525,8 @@ class AgentServiceClient {
           throw new AgentServiceError('Failed to fetch agent configuration', response.status);
         }
 
-        return await parseJsonResponseOrThrow<AgentConfig>(response, '/ask/config');
+        const rawConfig = await parseJsonResponseOrThrow<unknown>(response, '/ask/config');
+        return normalizeAgentConfig(rawConfig);
       } catch (error) {
         lastError = error;
         const isLastAttempt = attempt === CONFIG_RETRY_ATTEMPTS;

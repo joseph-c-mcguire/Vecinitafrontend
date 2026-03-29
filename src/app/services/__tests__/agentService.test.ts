@@ -495,7 +495,7 @@ describe('AgentServiceClient', () => {
 
       const result = await client.getConfig();
 
-      expect(result).toEqual(mockConfig);
+      expect(result).toMatchObject(mockConfig);
     });
 
     it('should handle config fetch error', async () => {
@@ -528,7 +528,7 @@ describe('AgentServiceClient', () => {
 
       const result = await renderClient.getConfig();
 
-      expect(result).toEqual(mockConfig);
+      expect(result).toMatchObject(mockConfig);
       expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
         'https://vecinita-agent.onrender.com/config'
       );
@@ -551,8 +551,41 @@ describe('AgentServiceClient', () => {
 
       const result = await client.getConfig();
 
-      expect(result).toEqual(mockConfig);
+      expect(result).toMatchObject(mockConfig);
       expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should normalize direct agent /config payload shape', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
+        },
+        json: async () => ({
+          providers: [{ key: 'ollama', label: 'Ollama (Local)', default: true }],
+          models: { ollama: ['llama3.1:8b'] },
+          defaultProvider: 'ollama',
+          defaultModel: 'llama3.1:8b',
+        }),
+      } as Response);
+
+      const result = await renderClient.getConfig();
+
+      expect(result.providers[0]?.name).toBe('ollama');
+      expect(result.providers[0]?.models).toEqual(['llama3.1:8b']);
+      expect(result.defaultProvider).toBe('ollama');
+      expect(result.defaultModel).toBe('llama3.1:8b');
+
+      locationSpy.mockRestore();
     });
 
     it('should fail fast with clear error when config endpoint returns HTML', async () => {
