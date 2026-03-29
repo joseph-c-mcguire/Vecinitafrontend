@@ -504,6 +504,36 @@ describe('AgentServiceClient', () => {
       await expect(client.getConfig()).rejects.toThrow(AgentServiceError);
     });
 
+    it('should use /config for direct Render agent hosts', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
+      const mockConfig: AgentConfig = {
+        providers: [{ name: 'ollama', models: ['llama3.1:8b'], default: true }],
+        models: { ollama: ['llama3.1:8b'] },
+      };
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
+        },
+        json: async () => mockConfig,
+      } as Response);
+
+      const result = await renderClient.getConfig();
+
+      expect(result).toEqual(mockConfig);
+      expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://vecinita-agent.onrender.com/config');
+
+      locationSpy.mockRestore();
+    });
+
     it('should retry getConfig on transient network error', async () => {
       const mockConfig: AgentConfig = {
         providers: [{ name: 'deepseek', models: ['deepseek-chat'], default: true }],

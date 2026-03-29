@@ -203,6 +203,23 @@ class AgentServiceClient {
     return new URL(`${normalizedBase}${normalizedPath}`, fallbackOrigin);
   }
 
+  private buildConfigUrl(): URL {
+    const normalizedBase = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
+
+    if (/^https?:\/\//i.test(normalizedBase)) {
+      try {
+        const parsed = new URL(normalizedBase);
+        if (isDirectRenderAgentHost(parsed.hostname)) {
+          return this.buildEndpointUrl('/config');
+        }
+      } catch {
+        // Fall through to the default gateway-style config path.
+      }
+    }
+
+    return this.buildEndpointUrl('/ask/config');
+  }
+
   /**
    * Ask a question and get a complete response (non-streaming).
    */
@@ -406,7 +423,7 @@ class AgentServiceClient {
    * Get agent configuration (available providers and models).
    */
   async getConfig(): Promise<AgentConfig> {
-    const url = this.buildEndpointUrl('/ask/config').toString();
+    const url = this.buildConfigUrl().toString();
     const CONFIG_RETRY_ATTEMPTS = 3;
     const CONFIG_RETRY_DELAY_MS = 800;
     let lastError: unknown;
