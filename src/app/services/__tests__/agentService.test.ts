@@ -5,7 +5,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { agentService, AgentServiceClient, AgentServiceError } from '../agentService';
+import {
+  agentService,
+  AgentServiceClient,
+  AgentServiceError,
+  resolveAgentServiceTimeouts,
+} from '../agentService';
 import type { AskQueryParams, AgentResponse, AgentConfig, StreamEvent } from '../../types/agent';
 
 // Mock fetch
@@ -295,6 +300,22 @@ describe('AgentServiceClient', () => {
           throw error;
         }
       }
+    });
+
+    it('should use configured request timeout override', async () => {
+      const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+      const customTimeoutClient = new AgentServiceClient('http://localhost:8002', {
+        requestMs: 45000,
+      });
+
+      vi.mocked(fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ answer: 'ok', sources: [] }),
+      } as Response);
+
+      await customTimeoutClient.ask({ question: 'test' });
+
+      expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 45000);
     });
 
     it('should handle network error', async () => {
@@ -645,6 +666,42 @@ describe('AgentServiceError', () => {
     const error = new AgentServiceError('Test error', 500, 'INTERNAL_ERROR');
 
     expect(error.code).toBe('INTERNAL_ERROR');
+  });
+});
+
+describe('resolveAgentServiceTimeouts', () => {
+  it('should use sane defaults when env values are missing or invalid', () => {
+    expect(resolveAgentServiceTimeouts({})).toEqual({
+      requestMs: 90000,
+      streamMs: 120000,
+      firstEventMs: 15000,
+    });
+
+    expect(
+      resolveAgentServiceTimeouts({
+        VITE_AGENT_REQUEST_TIMEOUT_MS: 'invalid',
+        VITE_AGENT_STREAM_TIMEOUT_MS: '-5',
+        VITE_AGENT_STREAM_FIRST_EVENT_TIMEOUT_MS: '0',
+      })
+    ).toEqual({
+      requestMs: 90000,
+      streamMs: 120000,
+      firstEventMs: 15000,
+    });
+  });
+
+  it('should respect explicit timeout env values', () => {
+    expect(
+      resolveAgentServiceTimeouts({
+        VITE_AGENT_REQUEST_TIMEOUT_MS: '95000',
+        VITE_AGENT_STREAM_TIMEOUT_MS: '130000',
+        VITE_AGENT_STREAM_FIRST_EVENT_TIMEOUT_MS: '20000',
+      })
+    ).toEqual({
+      requestMs: 95000,
+      streamMs: 130000,
+      firstEventMs: 20000,
+    });
   });
 });
 

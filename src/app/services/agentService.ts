@@ -14,6 +14,9 @@
  * ## Environment variables
  * - ``VITE_GATEWAY_URL``  — preferred gateway base URL
  * - ``VITE_BACKEND_URL`` — fallback gateway URL
+ * - ``VITE_AGENT_REQUEST_TIMEOUT_MS`` — timeout for non-stream requests
+ * - ``VITE_AGENT_STREAM_TIMEOUT_MS`` — overall timeout for stream requests
+ * - ``VITE_AGENT_STREAM_FIRST_EVENT_TIMEOUT_MS`` — first SSE event timeout
  * - ``VITE_AGENT_DEBUG`` — set to ``'true'`` to emit debug CustomEvents
  */
 
@@ -130,10 +133,32 @@ function resolveGatewayUrl(rawUrl: string): string {
   return trimmedUrl;
 }
 
-// Timeout configurations
-const REQUEST_TIMEOUT = 30000; // 30 seconds for standard requests
-const STREAM_TIMEOUT = 120000; // 120 seconds for streaming
-const STREAM_FIRST_EVENT_TIMEOUT = 15000;
+export interface AgentServiceTimeouts {
+  requestMs: number;
+  streamMs: number;
+  firstEventMs: number;
+}
+
+function parsePositiveTimeoutMs(rawValue: string | undefined, fallbackMs: number): number {
+  const parsedValue = Number(rawValue);
+  if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+    return fallbackMs;
+  }
+
+  return Math.floor(parsedValue);
+}
+
+export function resolveAgentServiceTimeouts(
+  env: Partial<ImportMetaEnv> = (import.meta as ImportMeta).env ?? {}
+): AgentServiceTimeouts {
+  return {
+    requestMs: parsePositiveTimeoutMs(env.VITE_AGENT_REQUEST_TIMEOUT_MS, 90000),
+    streamMs: parsePositiveTimeoutMs(env.VITE_AGENT_STREAM_TIMEOUT_MS, 120000),
+    firstEventMs: parsePositiveTimeoutMs(env.VITE_AGENT_STREAM_FIRST_EVENT_TIMEOUT_MS, 15000),
+  };
+}
+
+const DEFAULT_AGENT_SERVICE_TIMEOUTS = resolveAgentServiceTimeouts();
 
 const isAgentDebugEnabled = (): boolean => {
   if ((import.meta as ImportMeta).env?.VITE_AGENT_DEBUG === 'true') {
@@ -346,9 +371,15 @@ function normalizeAgentConfig(rawConfig: unknown): AgentConfig {
 
 class AgentServiceClient {
   private baseUrl: string;
+  private timeouts: AgentServiceTimeouts;
 
-  constructor(baseUrl: string = GATEWAY_URL) {
+  constructor(baseUrl: string = GATEWAY_URL, timeouts: Partial<AgentServiceTimeouts> = {}) {
     this.baseUrl = normalizeApiBaseUrl(resolveGatewayUrl(baseUrl));
+    this.timeouts = {
+      requestMs: timeouts.requestMs ?? DEFAULT_AGENT_SERVICE_TIMEOUTS.requestMs,
+      streamMs: timeouts.streamMs ?? DEFAULT_AGENT_SERVICE_TIMEOUTS.streamMs,
+      firstEventMs: timeouts.firstEventMs ?? DEFAULT_AGENT_SERVICE_TIMEOUTS.firstEventMs,
+    };
   }
 
   private debugLog(message: string, data?: unknown): void {
@@ -427,7 +458,7 @@ class AgentServiceClient {
     }
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+    const timeoutId = setTimeout(() => controller.abort(), this.timeouts.requestMs);
 
     try {
       const response = await fetch(url.toString(), {
@@ -499,7 +530,7 @@ class AgentServiceClient {
         reject(
           new AgentServiceError('Stream timeout - request took too long', 504, 'STREAM_TIMEOUT')
         );
-      }, STREAM_TIMEOUT);
+      }, this.timeouts.streamMs);
 
       let firstEventReceived = false;
       let firstEventTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -522,7 +553,7 @@ class AgentServiceClient {
         clearTimeout(timeoutId);
         eventSource.close();
         reject(new AgentServiceError('Stream stalled before first event', 408, 'STREAM_STALLED'));
-      }, STREAM_FIRST_EVENT_TIMEOUT);
+      }, this.timeouts.firstEventMs);
 
       eventSource.onmessage = (event) => {
         let data: StreamEvent;
