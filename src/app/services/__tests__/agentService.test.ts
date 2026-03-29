@@ -529,7 +529,9 @@ describe('AgentServiceClient', () => {
       const result = await renderClient.getConfig();
 
       expect(result).toEqual(mockConfig);
-      expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://vecinita-agent.onrender.com/config');
+      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+        'https://vecinita-agent.onrender.com/config'
+      );
 
       locationSpy.mockRestore();
     });
