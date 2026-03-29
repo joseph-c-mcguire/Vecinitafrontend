@@ -1,8 +1,20 @@
 /**
- * Agent Service - API Client for Backend Agent
+ * Agent Service — API Client for the Vecinita LangGraph Agent
  *
- * Handles communication with the LangGraph agent via the unified gateway.
- * Supports both streaming (SSE) and non-streaming requests.
+ * Handles all communication with the backend agent service, supporting both
+ * streaming (Server-Sent Events) and non-streaming request modes.
+ *
+ * ## Architecture
+ * Requests are routed through the Unified API Gateway
+ * (``VITE_GATEWAY_URL``) in normal deployments.  When the frontend is hosted
+ * on ``*.onrender.com`` and the GATEWAY_URL resolves to the agent's Render
+ * service directly, the client transparently adjusts path prefixes and the
+ * config endpoint URL so that all calls reach the correct handler.
+ *
+ * ## Environment variables
+ * - ``VITE_GATEWAY_URL``  — preferred gateway base URL
+ * - ``VITE_BACKEND_URL`` — fallback gateway URL
+ * - ``VITE_AGENT_DEBUG`` — set to ``'true'`` to emit debug CustomEvents
  */
 
 import type { AgentResponse, AgentConfig, AskQueryParams, StreamEvent } from '../types/agent';
@@ -14,10 +26,35 @@ const GATEWAY_URL =
   import.meta.env.VITE_BACKEND_URL ||
   (import.meta.env.DEV ? '/api' : 'http://localhost:8004/api/v1');
 
+/**
+ * Return true when *hostname* belongs to a Render-hosted agent service.
+ *
+ * Detection relies on two Render naming conventions:
+ * 1. The hostname ends with `.onrender.com`.
+ * 2. The subdomain contains the string `"-agent"` (e.g. `vecinita-agent`).
+ *
+ * This is used to distinguish a frontend talking directly to the agent
+ * service (no gateway prefix) from one talking through the unified gateway
+ * (where `/ask/config` is the correct config path instead of `/config`).
+ */
 function isDirectRenderAgentHost(hostname: string): boolean {
   return hostname.endsWith('.onrender.com') && hostname.includes('-agent');
 }
 
+/**
+ * Strip the gateway path prefix from a URL pathname when talking directly
+ * to the agent service on Render.
+ *
+ * The unified gateway exposes endpoints under ``/api`` or ``/api/v1``.
+ * When the frontend resolves to the agent's hostname directly (no gateway),
+ * those prefixes are not valid — the agent serves ``/ask``, ``/config``,
+ * etc. at the root.  This function removes the gateway prefix so that the
+ * constructed URL resolves correctly against the agent.
+ *
+ * @param pathname - URL pathname potentially containing a gateway prefix.
+ * @returns Pathname with ``/api`` or ``/api/v1`` stripped, or empty string
+ *          if the pathname *was* the prefix.
+ */
 function stripGatewayPrefixForDirectAgent(pathname: string): string {
   const normalizedPath = pathname.replace(/\/+$/, '');
   if (normalizedPath === '/api' || normalizedPath === '/api/v1') {
@@ -26,6 +63,26 @@ function stripGatewayPrefixForDirectAgent(pathname: string): string {
   return normalizedPath;
 }
 
+/**
+ * Resolve the effective gateway URL for the current browser context.
+ *
+ * Handles three scenarios:
+ *
+ * 1. **SSR / non-browser** — returns *rawUrl* unchanged.
+ * 2. **Render hosted frontend** — when the frontend is on
+ *    ``<name>-frontend.onrender.com`` and *rawUrl* is a relative path,
+ *    the agent hostname is inferred by replacing ``-frontend`` with
+ *    ``-agent`` in the current hostname and the inappropriate gateway
+ *    prefix is stripped for direct agent hosts.
+ * 3. **Local dev** — relative URLs and ``localhost`` absolute URLs pass
+ *    through unchanged.
+ * 4. **Stale absolute URL** — when an absolute URL contains a
+ *    ``localhost`` or wrong-port hostname, the current window hostname is
+ *    substituted to avoid cross-origin failures after deployment.
+ *
+ * @param rawUrl - Raw gateway URL from an environment variable or config.
+ * @returns Resolved URL string suitable for use as the fetch base.
+ */
 function resolveGatewayUrl(rawUrl: string): string {
   if (typeof window === 'undefined') {
     return rawUrl;
@@ -102,6 +159,18 @@ function emitAgentDebugEvent(scope: string, message: string, data?: unknown): vo
   );
 }
 
+/**
+ * Normalise a raw base URL into a canonical API base path.
+ *
+ * Ensures the resulting URL:
+ * - Has no trailing slash.
+ * - Ends with `/api/v1` for standard gateway URLs (unless the host is a
+ *   direct Render agent, in which case the gateway prefix is stripped).
+ * - Returns `'/api'` as a safe fallback when the input is empty.
+ *
+ * @param baseUrl - Raw base URL (absolute or relative).
+ * @returns Normalised base URL string.
+ */
 function normalizeApiBaseUrl(baseUrl: string): string {
   const normalizedInput = (baseUrl || '').trim().replace(/\/+$/, '');
   if (!normalizedInput) {
@@ -175,6 +244,22 @@ async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: st
   }
 }
 
+/**
+ * Normalise a raw agent config payload into the canonical {@link AgentConfig}
+ * shape expected by the frontend.
+ *
+ * The direct agent ``GET /config`` response uses ``{ key, label }`` fields
+ * for providers rather than the ``{ name, models }`` shape expected by the
+ * frontend.  This function accepts either shape and maps both to the
+ * canonical form so that the rest of the UI can work with one consistent
+ * interface regardless of which endpoint was called.
+ *
+ * @param rawConfig - Untyped JSON payload from the agent or gateway config
+ *                    endpoint.
+ * @returns Validated and normalised {@link AgentConfig}.
+ * @throws {@link AgentServiceError} when the payload is fundamentally
+ *         malformed (not an object, no providers at all).
+ */
 function normalizeAgentConfig(rawConfig: unknown): AgentConfig {
   if (!rawConfig || typeof rawConfig !== 'object') {
     throw new AgentServiceError('Agent config payload is malformed', 0, 'INVALID_CONFIG_PAYLOAD');
@@ -287,6 +372,19 @@ class AgentServiceClient {
     return new URL(`${normalizedBase}${normalizedPath}`, fallbackOrigin);
   }
 
+  /**
+   * Build the URL for the agent configuration endpoint.
+   *
+   * The correct config endpoint differs depending on how the frontend
+   * reaches the backend:
+   *
+   * - **Direct Render agent host** (``vecinita-agent.onrender.com``) —
+   *   the agent exposes config at ``GET /config`` (no gateway prefix).
+   * - **Unified gateway** — config is at ``GET /ask/config`` because the
+   *   gateway namespaces agent routes under ``/ask``.
+   *
+   * @returns Fully-qualified {@link URL} for the config endpoint.
+   */
   private buildConfigUrl(): URL {
     const normalizedBase = this.baseUrl.endsWith('/') ? this.baseUrl.slice(0, -1) : this.baseUrl;
 
