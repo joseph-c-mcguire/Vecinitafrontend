@@ -10,7 +10,7 @@ export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 export const supabaseConfigError =
   'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.';
 
-if (!isSupabaseConfigured && !devAdminEnabled) {
+if (import.meta.env.DEV && !isSupabaseConfigured && !devAdminEnabled) {
   console.warn(`[Supabase] ${supabaseConfigError}`);
 }
 

@@ -341,14 +341,9 @@ describe('BackendSettingsContext', () => {
 
   describe('context error', () => {
     it('should throw error when used outside provider', () => {
-      // Suppress console error for this test
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       expect(() => {
         renderHook(() => useBackendSettings());
       }).toThrow('useBackendSettings must be used within a BackendSettingsProvider');
-
-      consoleError.mockRestore();
     });
   });
 });
