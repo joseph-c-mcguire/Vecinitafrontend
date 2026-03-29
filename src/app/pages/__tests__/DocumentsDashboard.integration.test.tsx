@@ -134,6 +134,43 @@ describe('DocumentsDashboard integration', () => {
     });
   });
 
+  it('renders an error state when overview returns HTML instead of JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve({
+            ok: true,
+            headers: {
+              get: () => 'text/html; charset=utf-8',
+            },
+            json: async () => {
+              throw new SyntaxError("Unexpected token '<'");
+            },
+          } as Response);
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve({ ok: true, json: async () => ({ tags: [] }) } as Response);
+        }
+
+        return Promise.resolve({ ok: false, status: 404 } as Response);
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /Failed to load resources: \/documents\/overview returned non-JSON response/i
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
   it('supports topic filtering and renders actionable source links', async () => {
     const user = userEvent.setup();
 

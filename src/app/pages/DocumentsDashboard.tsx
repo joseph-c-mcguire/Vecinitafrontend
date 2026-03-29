@@ -3,20 +3,33 @@ import { ExternalLink, Link2, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 function resolveApiBase(rawUrl: string): string {
+  const trimmedUrl = (rawUrl || '').trim().replace(/\/+$/, '');
+
   if (typeof window === 'undefined') {
-    return rawUrl;
+    return trimmedUrl || rawUrl;
   }
 
   const currentHost = window.location.hostname;
   const isCurrentHostLocal =
     currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
+  const inferredGatewayHost =
+    currentHost.endsWith('.onrender.com') && currentHost.includes('-frontend')
+      ? currentHost.replace('-frontend', '-gateway')
+      : currentHost;
 
   if (isCurrentHostLocal) {
-    return rawUrl;
+    return trimmedUrl || rawUrl;
+  }
+
+  if (trimmedUrl.startsWith('/')) {
+    if (inferredGatewayHost !== currentHost) {
+      return `${window.location.protocol}//${inferredGatewayHost}${trimmedUrl}`;
+    }
+    return trimmedUrl;
   }
 
   try {
-    const parsed = new URL(rawUrl);
+    const parsed = new URL(trimmedUrl || rawUrl);
     const isConfiguredLocal =
       parsed.hostname === 'localhost' ||
       parsed.hostname === '127.0.0.1' ||
@@ -25,14 +38,14 @@ function resolveApiBase(rawUrl: string): string {
     const isStaleAbsoluteHost = parsed.hostname !== currentHost;
 
     if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = currentHost;
+      parsed.hostname = inferredGatewayHost;
       return parsed.toString().replace(/\/+$/, '');
     }
   } catch {
-    return rawUrl;
+    return trimmedUrl || rawUrl;
   }
 
-  return rawUrl;
+  return trimmedUrl || rawUrl;
 }
 
 const API_BASE = resolveApiBase(
@@ -63,6 +76,24 @@ interface TagStatsResponseRow {
   source_count?: number;
 }
 
+async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: string): Promise<T> {
+  const contentType = response.headers?.get?.('content-type')?.toLowerCase() || '';
+  const looksJson = contentType.includes('application/json');
+
+  if (contentType && !looksJson) {
+    throw new Error(
+      `${endpointLabel} returned non-JSON response (content-type: ${contentType || 'unknown'}). ` +
+        'Check gateway URL configuration.'
+    );
+  }
+
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new Error(`${endpointLabel} returned malformed JSON. Check gateway URL configuration.`);
+  }
+}
+
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="rounded-xl border bg-card p-5 shadow-sm">
@@ -86,13 +117,13 @@ export default function DocumentsDashboard() {
     Promise.all([
       fetch(`${API_BASE}/documents/overview`).then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        return parseJsonResponseOrThrow<Overview>(r, '/documents/overview');
       }),
       fetch(`${API_BASE}/documents/tags?limit=100`).then((r) => {
         if (!r.ok) {
           return { tags: [] };
         }
-        return r.json();
+        return parseJsonResponseOrThrow<{ tags?: TagStatsResponseRow[] }>(r, '/documents/tags');
       }),
     ])
       .then(([overviewData, tagsData]) => {
@@ -142,7 +173,10 @@ export default function DocumentsDashboard() {
       throw new Error(`${t('docsDownloadError')} (HTTP ${response.status})`);
     }
 
-    const payload = await response.json();
+    const payload = await parseJsonResponseOrThrow<{ download_url?: string }>(
+      response,
+      '/documents/download-url'
+    );
     if (!payload.download_url) {
       throw new Error(t('docsNoDownloadAvailable'));
     }
