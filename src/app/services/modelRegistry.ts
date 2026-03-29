@@ -59,6 +59,8 @@ interface AskConfigResponse {
 }
 
 interface EmbedConfigResponse {
+  model?: string;
+  provider?: string;
   current?: { provider?: string; model?: string };
   available?: {
     providers?: Array<{ key: string; label: string }>;
@@ -82,6 +84,34 @@ function toProviderMap(
   );
 }
 
+function normalizeEmbeddingProviders(
+  embedData: EmbedConfigResponse
+): Record<string, { name: string; models: string[] }> {
+  const fromAvailable = toProviderMap(
+    embedData.available?.providers ?? [],
+    embedData.available?.models ?? {}
+  );
+
+  if (Object.keys(fromAvailable).length > 0) {
+    return fromAvailable;
+  }
+
+  // Newer backend/service config shape can return a flat object
+  // like { provider, model, dimension } without available.providers.
+  const provider = embedData.current?.provider ?? embedData.provider;
+  const model = embedData.current?.model ?? embedData.model;
+  if (!provider || !model) {
+    return {};
+  }
+
+  return {
+    [provider]: {
+      name: provider,
+      models: [model],
+    },
+  };
+}
+
 export async function fetchModelRegistry(): Promise<ModelRegistryData> {
   const [askRes, embedRes] = await Promise.all([
     fetch(`${API_BASE}/ask/config`),
@@ -99,10 +129,7 @@ export async function fetchModelRegistry(): Promise<ModelRegistryData> {
   const embedData = (await embedRes.json()) as EmbedConfigResponse;
 
   const llmProviders = toProviderMap(askData.providers, askData.models);
-  const embeddingProviders = toProviderMap(
-    embedData.available?.providers ?? [],
-    embedData.available?.models ?? {}
-  );
+  const embeddingProviders = normalizeEmbeddingProviders(embedData);
 
   return {
     llmProviders,
