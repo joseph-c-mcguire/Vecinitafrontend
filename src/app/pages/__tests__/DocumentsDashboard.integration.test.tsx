@@ -363,7 +363,9 @@ describe('DocumentsDashboard integration', () => {
       expect(screen.getByRole('button', { name: '…' })).toBeDisabled();
     });
 
-    resolveDownloadRequest?.(jsonResponse({ download_url: 'https://downloads.example.org/pending-download.pdf' }));
+    resolveDownloadRequest?.(
+      jsonResponse({ download_url: 'https://downloads.example.org/pending-download.pdf' })
+    );
 
     await waitFor(() => {
       expect(openSpy).toHaveBeenCalledWith(
