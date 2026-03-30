@@ -12,7 +12,6 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -36,7 +35,20 @@ jobs:
           npm run test:unit
           npm run build
 
+      - name: Detect deploy hook configuration
+        id: deploy_hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Render deploy hook is not configured; skipping deploy."
+          fi
+
       - name: Trigger Render deploy
+        if: steps.deploy_hook.outputs.configured == 'true'
         env:
           RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: curl --fail --silent --show-error -X POST "$RENDER_DEPLOY_HOOK_URL"
