@@ -3,6 +3,18 @@ import { render, waitFor, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../../App';
 
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers,
+  });
+}
+
 /**
  * Integration tests for the main App component
  * Verifies that App.tsx still renders and functions correctly after cleanup
@@ -43,33 +55,26 @@ describe('App Component - Integration Tests', () => {
         const url = String(input);
 
         if (url.includes('/ask/config')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               provider: 'ollama',
               model: 'llama3.2',
               providers: { available: ['ollama'], current: 'ollama' },
               models: { available: ['llama3.2'], current: 'llama3.2' },
               embedding: { model: 'BAAI/bge-small-en-v1.5' },
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ sources: [] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ sources: [] }));
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ tags: [] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ tags: [] }));
         }
 
-        return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+        return Promise.resolve(jsonResponse({}));
       })
     );
 

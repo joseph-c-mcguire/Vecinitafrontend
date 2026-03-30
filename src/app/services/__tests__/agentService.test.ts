@@ -60,6 +60,18 @@ function installMockEventSource() {
   return TestEventSource;
 }
 
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers,
+  });
+}
+
 describe('AgentServiceClient', () => {
   let client: AgentServiceClient;
 
@@ -80,10 +92,7 @@ describe('AgentServiceClient', () => {
         thread_id: 'thread-123',
       };
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(mockResponse));
 
       const params: AskQueryParams = {
         question: 'What is testing?',
@@ -101,10 +110,7 @@ describe('AgentServiceClient', () => {
     });
 
     it('should include all query parameters', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'test', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'test', sources: [] }));
 
       const params: AskQueryParams = {
         question: 'Test question',
@@ -129,10 +135,7 @@ describe('AgentServiceClient', () => {
     it('should support relative proxy base URLs', async () => {
       const relativeClient = new AgentServiceClient('/api');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await relativeClient.ask({ question: 'hello' });
 
@@ -144,10 +147,7 @@ describe('AgentServiceClient', () => {
     it('should normalize absolute base URL without API prefix', async () => {
       const absoluteClient = new AgentServiceClient('http://localhost:8004');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await absoluteClient.ask({ question: 'hello' });
 
@@ -164,10 +164,7 @@ describe('AgentServiceClient', () => {
 
       const publicClient = new AgentServiceClient('http://localhost:18004/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await publicClient.ask({ question: 'hello' });
 
@@ -186,10 +183,7 @@ describe('AgentServiceClient', () => {
 
       const localClient = new AgentServiceClient('http://localhost:18004/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await localClient.ask({ question: 'hello' });
 
@@ -208,10 +202,7 @@ describe('AgentServiceClient', () => {
 
       const staleHostClient = new AgentServiceClient('http://34.55.88.67:18004/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await staleHostClient.ask({ question: 'hello' });
 
@@ -231,14 +222,7 @@ describe('AgentServiceClient', () => {
 
       const renderClient = new AgentServiceClient('/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
-        },
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await renderClient.ask({ question: 'hello' });
 
@@ -258,10 +242,7 @@ describe('AgentServiceClient', () => {
 
       const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await renderClient.ask({ question: 'hello' });
 
@@ -273,11 +254,12 @@ describe('AgentServiceClient', () => {
     });
 
     it('should handle HTTP error', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: false,
-        status: 500,
-        text: async () => 'Server error',
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response('Server error', {
+          status: 500,
+          headers: { 'content-type': 'text/plain; charset=utf-8' },
+        })
+      );
 
       await expect(client.ask({ question: 'test' })).rejects.toThrow(AgentServiceError);
     });
@@ -308,10 +290,7 @@ describe('AgentServiceClient', () => {
         requestMs: 45000,
       });
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ answer: 'ok', sources: [] }),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
 
       await customTimeoutClient.ask({ question: 'test' });
 
@@ -325,15 +304,12 @@ describe('AgentServiceClient', () => {
     });
 
     it('should surface clear error when /ask returns HTML instead of JSON', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null,
-        },
-        json: async () => ({}) as AgentResponse,
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response('<!doctype html><html><body>fallback</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
+      );
 
       await expect(client.ask({ question: 'test' })).rejects.toMatchObject({
         code: 'INVALID_RESPONSE_FORMAT',
@@ -509,10 +485,7 @@ describe('AgentServiceClient', () => {
         models: { groq: ['llama-3.1'] },
       };
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockConfig,
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(mockConfig));
 
       const result = await client.getConfig();
 
@@ -538,14 +511,7 @@ describe('AgentServiceClient', () => {
         models: { ollama: ['llama3.1:8b'] },
       };
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
-        },
-        json: async () => mockConfig,
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(mockConfig));
 
       const result = await renderClient.getConfig();
 
@@ -565,10 +531,7 @@ describe('AgentServiceClient', () => {
 
       vi.mocked(fetch)
         .mockRejectedValueOnce(new Error('Connection reset'))
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockConfig,
-        } as Response);
+        .mockResolvedValueOnce(jsonResponse(mockConfig));
 
       const result = await client.getConfig();
 
@@ -585,19 +548,14 @@ describe('AgentServiceClient', () => {
 
       const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
 
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type' ? 'application/json; charset=utf-8' : null,
-        },
-        json: async () => ({
+      vi.mocked(fetch).mockResolvedValueOnce(
+        jsonResponse({
           providers: [{ key: 'ollama', label: 'Ollama (Local)', default: true }],
           models: { ollama: ['llama3.1:8b'] },
           defaultProvider: 'ollama',
           defaultModel: 'llama3.1:8b',
-        }),
-      } as Response);
+        })
+      );
 
       const result = await renderClient.getConfig();
 
@@ -610,15 +568,12 @@ describe('AgentServiceClient', () => {
     });
 
     it('should fail fast with clear error when config endpoint returns HTML', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        headers: {
-          get: (name: string) =>
-            name.toLowerCase() === 'content-type' ? 'text/html; charset=utf-8' : null,
-        },
-        json: async () => ({}),
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(
+        new Response('<!doctype html><html><body>fallback</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        })
+      );
 
       await expect(client.getConfig()).rejects.toMatchObject({
         code: 'INVALID_RESPONSE_FORMAT',
@@ -629,9 +584,7 @@ describe('AgentServiceClient', () => {
 
   describe('healthCheck', () => {
     it('should return true when service is healthy', async () => {
-      vi.mocked(fetch).mockResolvedValueOnce({
-        ok: true,
-      } as Response);
+      vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 200 }));
 
       const result = await client.healthCheck();
 

@@ -4,6 +4,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import DocumentsDashboard from '../DocumentsDashboard';
 
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers,
+  });
+}
+
 vi.mock('../../context/LanguageContext', () => ({
   useLanguage: () => ({
     t: (key: string) =>
@@ -45,9 +57,8 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               sources: [
                 {
                   url: 'https://example.org/a',
@@ -62,30 +73,26 @@ describe('DocumentsDashboard integration', () => {
                   tags: ['benefits'],
                 },
               ],
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               tags: [
                 { tag: 'housing', source_count: 2, chunk_count: 7 },
                 { tag: 'benefits', source_count: 1, chunk_count: 3 },
               ],
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/preview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ chunks: [] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ chunks: [] }));
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
   });
@@ -116,14 +123,14 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({ ok: false, status: 503 } as Response);
+          return Promise.resolve(new Response(null, { status: 503 }));
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({ ok: true, json: async () => ({ tags: [] }) } as Response);
+          return Promise.resolve(jsonResponse({ tags: [] }));
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
 
@@ -150,10 +157,10 @@ describe('DocumentsDashboard integration', () => {
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({ ok: true, json: async () => ({ tags: [] }) } as Response);
+          return Promise.resolve(jsonResponse({ tags: [] }));
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
 
@@ -210,9 +217,8 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               sources: [
                 {
                   url: 'stored/clinic-flyer.pdf',
@@ -222,27 +228,21 @@ describe('DocumentsDashboard integration', () => {
                   downloadable: true,
                 },
               ],
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ tags: [{ tag: 'health', source_count: 1 }] }));
         }
 
         if (url.includes('/documents/download-url')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
-              download_url: 'https://downloads.example.org/clinic-flyer.pdf',
-            }),
-          } as Response);
+          return Promise.resolve(
+            jsonResponse({ download_url: 'https://downloads.example.org/clinic-flyer.pdf' })
+          );
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
 
@@ -270,9 +270,8 @@ describe('DocumentsDashboard integration', () => {
       const url = String(input);
 
       if (url.includes('/documents/overview')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
+        return Promise.resolve(
+          jsonResponse({
             sources: [
               {
                 url: 'stored/ready-download.pdf',
@@ -282,18 +281,15 @@ describe('DocumentsDashboard integration', () => {
                 download_url: 'https://downloads.example.org/ready-download.pdf',
               },
             ],
-          }),
-        } as Response);
+          })
+        );
       }
 
       if (url.includes('/documents/tags')) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
-        } as Response);
+        return Promise.resolve(jsonResponse({ tags: [{ tag: 'health', source_count: 1 }] }));
       }
 
-      return Promise.resolve({ ok: false, status: 404 } as Response);
+      return Promise.resolve(new Response(null, { status: 404 }));
     });
 
     vi.stubGlobal('fetch', fetchSpy);
@@ -325,9 +321,8 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               sources: [
                 {
                   url: 'stored/pending-download.pdf',
@@ -337,15 +332,12 @@ describe('DocumentsDashboard integration', () => {
                   downloadable: true,
                 },
               ],
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ tags: [{ tag: 'health', source_count: 1 }] }));
         }
 
         if (url.includes('/documents/download-url')) {
@@ -354,7 +346,7 @@ describe('DocumentsDashboard integration', () => {
           });
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
 
@@ -371,12 +363,7 @@ describe('DocumentsDashboard integration', () => {
       expect(screen.getByRole('button', { name: '…' })).toBeDisabled();
     });
 
-    resolveDownloadRequest?.({
-      ok: true,
-      json: async () => ({
-        download_url: 'https://downloads.example.org/pending-download.pdf',
-      }),
-    } as Response);
+    resolveDownloadRequest?.(jsonResponse({ download_url: 'https://downloads.example.org/pending-download.pdf' }));
 
     await waitFor(() => {
       expect(openSpy).toHaveBeenCalledWith(
@@ -401,9 +388,8 @@ describe('DocumentsDashboard integration', () => {
         const url = String(input);
 
         if (url.includes('/documents/overview')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({
+          return Promise.resolve(
+            jsonResponse({
               sources: [
                 {
                   url: 'stored/failing-download.pdf',
@@ -413,22 +399,19 @@ describe('DocumentsDashboard integration', () => {
                   downloadable: true,
                 },
               ],
-            }),
-          } as Response);
+            })
+          );
         }
 
         if (url.includes('/documents/tags')) {
-          return Promise.resolve({
-            ok: true,
-            json: async () => ({ tags: [{ tag: 'health', source_count: 1 }] }),
-          } as Response);
+          return Promise.resolve(jsonResponse({ tags: [{ tag: 'health', source_count: 1 }] }));
         }
 
         if (url.includes('/documents/download-url')) {
-          return Promise.resolve({ ok: false, status: 500 } as Response);
+          return Promise.resolve(new Response(null, { status: 500 }));
         }
 
-        return Promise.resolve({ ok: false, status: 404 } as Response);
+        return Promise.resolve(new Response(null, { status: 404 }));
       })
     );
 
