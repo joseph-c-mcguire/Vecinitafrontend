@@ -4,22 +4,23 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { Fragment } from 'react';
 import { MessageSquare, RefreshCw, Send } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useBackendSettings } from '../hooks/useBackendSettings';
-import { useAgentChat } from '../hooks/useAgentChat';
+import { useChatState } from '../context/ChatStateContext';
 import { ChatMessage } from '../components/ChatMessage';
 import { StreamingIndicator } from '../components/StreamingIndicator';
+import { SuggestionChips } from '../components/SuggestionChips';
 import { ChatWidget } from '../components/ChatWidget';
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardFooter, CardHeader } from '../components/ui/card';
 import { Separator } from '../components/ui/separator';
 
 export default function ChatPage() {
-  const { t, language } = useLanguage();
-  const { selectedLLM } = useBackendSettings();
+  const { t } = useLanguage();
   const [input, setInput] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [shouldStickToBottom, setShouldStickToBottom] = useState(true);
 
   const {
     messages,
@@ -28,18 +29,45 @@ export default function ChatPage() {
     progressMessages,
     pendingClarification,
     error,
+    splashSuggestions,
     sendMessage,
     clearThread,
     retryLastMessage,
-  } = useAgentChat({
-    language: language as 'en' | 'es',
-    provider: selectedLLM?.provider,
-    model: selectedLLM?.model,
-  });
+  } = useChatState();
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamingMessage]);
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    const onScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      setShouldStickToBottom(distanceFromBottom < 120);
+    };
+
+    container.addEventListener('scroll', onScroll);
+    onScroll();
+
+    return () => {
+      container.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!shouldStickToBottom) {
+      return;
+    }
+
+    const container = messagesContainerRef.current;
+    if (!container) {
+      return;
+    }
+
+    // Keep scrolling constrained to the chat container instead of the page viewport.
+    container.scrollTo?.({ top: container.scrollHeight, behavior: 'smooth' });
+  }, [messages, streamingMessage, shouldStickToBottom]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -48,6 +76,7 @@ export default function ChatPage() {
     }
     const question = input;
     setInput('');
+    setShouldStickToBottom(true);
     await sendMessage(question);
   };
 
@@ -56,6 +85,16 @@ export default function ChatPage() {
       event.preventDefault();
       void handleSubmit(event);
     }
+  };
+
+  const handleSuggestionClick = async (suggestion: string) => {
+    if (isLoading || !suggestion.trim()) {
+      return;
+    }
+
+    setInput('');
+    setShouldStickToBottom(true);
+    await sendMessage(suggestion);
   };
 
   const progressHint =
@@ -77,54 +116,80 @@ export default function ChatPage() {
 
       <Card className="flex flex-1 flex-col overflow-hidden shadow-sm">
         <CardHeader className="p-0" />
-        <CardContent className="flex-1 overflow-y-auto p-0">
-          {messages.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground">
-              <MessageSquare className="mx-auto mb-3 h-6 w-6" />
-              <p className="text-sm">{t('welcomeMessage')}</p>
-            </div>
-          )}
+        <CardContent className="flex-1 p-0">
+          <div ref={messagesContainerRef} className="h-full overflow-y-auto">
+            {messages.length === 0 && (
+              <div className="p-8 text-center text-muted-foreground">
+                <MessageSquare className="mx-auto mb-3 h-6 w-6" />
+                <p className="text-sm">{t('welcomeMessage')}</p>
+                <SuggestionChips
+                  title={t('suggestionsStartLabel')}
+                  suggestions={splashSuggestions}
+                  onSelect={(suggestion) => {
+                    void handleSuggestionClick(suggestion);
+                  }}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
 
-          {messages.map((message) => (
-            <ChatMessage key={message.id} message={message} />
-          ))}
+            {messages.map((message) => (
+              <Fragment key={message.id}>
+                <ChatMessage message={message} />
+                {message.role === 'assistant' &&
+                  message.content.trim().length > 0 &&
+                  (message.suggestedQuestions || []).length > 0 && (
+                    <div className="px-4 pb-3">
+                      <SuggestionChips
+                        title={t('suggestionsFollowupLabel')}
+                        suggestions={message.suggestedQuestions || []}
+                        onSelect={(suggestion) => {
+                          void handleSuggestionClick(suggestion);
+                        }}
+                        disabled={isLoading}
+                      />
+                    </div>
+                  )}
+              </Fragment>
+            ))}
 
-          {(streamingMessage || progressHint) && (
-            <StreamingIndicator message={streamingMessage || progressHint} />
-          )}
-          {pendingClarification && (
-            <div className="mx-4 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
-                {t('clarificationActionRequired')}
-              </p>
-              <p className="text-sm text-foreground">{pendingClarification.prompt}</p>
-              {pendingClarification.questions.length > 0 && (
-                <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                  {pendingClarification.questions.map((question, index) => (
-                    <li key={`${index}-${question}`}>
-                      {index + 1}. {question}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-          {error && (
-            <div className="m-4 rounded-lg border border-destructive bg-destructive/10 p-4">
-              <p className="mb-2 text-sm font-medium text-destructive">{t('error.title')}</p>
-              <p className="mb-3 text-sm text-muted-foreground">{error.message}</p>
-              <button
-                onClick={() => retryLastMessage()}
-                className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                type="button"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {t('error.retry')}
-              </button>
-            </div>
-          )}
+            {(streamingMessage || progressHint) && (
+              <StreamingIndicator message={streamingMessage || progressHint} />
+            )}
+            {pendingClarification && (
+              <div className="mx-4 mb-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                  {t('clarificationActionRequired')}
+                </p>
+                <p className="text-sm text-foreground">{pendingClarification.prompt}</p>
+                {pendingClarification.questions.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                    {pendingClarification.questions.map((question, index) => (
+                      <li key={`${index}-${question}`}>
+                        {index + 1}. {question}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+            {error && (
+              <div className="m-4 rounded-lg border border-destructive bg-destructive/10 p-4">
+                <p className="mb-2 text-sm font-medium text-destructive">{t('error.title')}</p>
+                <p className="mb-3 text-sm text-muted-foreground">{error.message}</p>
+                <button
+                  onClick={() => retryLastMessage()}
+                  className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                  type="button"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  {t('error.retry')}
+                </button>
+              </div>
+            )}
 
-          <div ref={messagesEndRef} />
+            <div aria-hidden="true" className="h-px" />
+          </div>
         </CardContent>
 
         <Separator />

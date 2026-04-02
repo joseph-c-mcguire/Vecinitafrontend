@@ -158,6 +158,31 @@ async function installUnsafeContentJourneyStream(page: Page): Promise<void> {
   });
 }
 
+async function installSuggestionJourneyStream(page: Page): Promise<void> {
+  await page.route('**/ask/stream**', async (route) => {
+    const body = [
+      `data: ${JSON.stringify({
+        type: 'complete',
+        answer: 'Here are community resources to get started.',
+        sources: [],
+        suggested_questions: ['Can you summarize this in 3 key points?', 'What should I do first?'],
+        thread_id: 'suggestion-thread',
+        metadata: { progress: 100, stage: 'complete' },
+      })}\n\n`,
+    ].join('');
+
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+      body,
+    });
+  });
+}
+
 test.describe('Journey Chat (J001-J008)', () => {
   test('J001 loads chat home', async ({ page }) => {
     await page.goto('/');
@@ -409,5 +434,35 @@ test.describe('Journey Chat (J001-J008)', () => {
     ]);
     await expect(popup).toHaveURL('https://safe.example.org/clinic');
     await popup.close();
+  });
+
+  test('suggestion journey shows splash chips and auto-sends follow-up chips', async ({ page }) => {
+    await installChatConfigFixture(page);
+    await installSuggestionJourneyStream(page);
+
+    await page.goto('/');
+
+    const splashSuggestion = page.getByRole('button', {
+      name: 'What environmental concerns can I report in my neighborhood?',
+      exact: true,
+    });
+    await expect(splashSuggestion).toBeVisible();
+    await splashSuggestion.click();
+
+    await expect(
+      page.getByText('What environmental concerns can I report in my neighborhood?')
+    ).toBeVisible();
+
+    const followupSuggestion = page.getByRole('button', {
+      name: 'What should I do first?',
+      exact: true,
+    });
+    await expect(followupSuggestion).toBeVisible();
+    await followupSuggestion.click();
+
+    const userMessages = page
+      .locator('[data-testid="chat-message"][data-message-role="user"]')
+      .filter({ hasText: 'What should I do first?' });
+    await expect(userMessages.first()).toBeVisible({ timeout: 15000 });
   });
 });

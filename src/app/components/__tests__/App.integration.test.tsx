@@ -25,8 +25,35 @@ describe('App Component - Integration Tests', () => {
     localStorage.clear();
     vi.clearAllMocks();
 
-    // Mock scrollIntoView since jsdom doesn't support it
+    // Mock scrollIntoView / scrollTo since jsdom doesn't support them
     Element.prototype.scrollIntoView = vi.fn();
+    Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
+
+    // Provide default fetch stub so BackendSettingsContext doesn't hang on /ask/config
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/ask/config') || url.includes('/config')) {
+          return Promise.resolve(
+            jsonResponse({
+              provider: 'ollama',
+              model: 'llama3.2',
+              providers: { available: ['ollama'], current: 'ollama' },
+              models: { available: ['llama3.2'], current: 'llama3.2' },
+              embedding: { model: 'BAAI/bge-small-en-v1.5' },
+            })
+          );
+        }
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve(jsonResponse({ sources: [] }));
+        }
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve(jsonResponse({ tags: [] }));
+        }
+        return Promise.resolve(jsonResponse({}));
+      })
+    );
   });
 
   it('should render main components without import errors', async () => {

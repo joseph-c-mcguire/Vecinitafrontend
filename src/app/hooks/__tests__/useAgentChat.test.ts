@@ -8,6 +8,35 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useAgentChat } from '../useAgentChat';
 import { agentService, AgentServiceError } from '../../services/agentService';
+import type { Message } from '../useConversationStorage';
+
+let activeThreadId = 'test-uuid-123';
+let threadMessages = new Map<string, Message[]>();
+type StorageSyncEvent = { type: string; threadId?: string };
+
+const { mockStorage, getStoredActiveThreadIdMock, getLatestStoredThreadIdMock } = vi.hoisted(
+  () => ({
+    mockStorage: {
+      saveMessages: vi.fn(),
+      saveMessagesForThread: vi.fn(),
+      loadMessages: vi.fn<() => Message[] | null>(() => null),
+      loadMessagesForThread: vi.fn<(threadId: string) => Message[] | null>(() => null),
+      deleteThread: vi.fn(),
+      deleteThreadById: vi.fn(),
+      clearExpired: vi.fn(),
+      getAllThreadIds: vi.fn(() => []),
+      getTimeRemaining: vi.fn(() => null),
+      getLatestThreadId: vi.fn(() => null),
+      getActiveThreadId: vi.fn(() => null),
+      setActiveThreadId: vi.fn(),
+      subscribeToStorageEvents: vi.fn<(cb: (event: StorageSyncEvent) => void) => () => void>(
+        () => () => {}
+      ),
+    },
+    getStoredActiveThreadIdMock: vi.fn<() => string | null>(() => null),
+    getLatestStoredThreadIdMock: vi.fn<() => string | null>(() => null),
+  })
+);
 
 // Mock dependencies
 vi.mock('../../services/agentService', async () => {
@@ -27,14 +56,9 @@ vi.mock('../../services/agentService', async () => {
   };
 });
 vi.mock('../useConversationStorage', () => ({
-  useConversationStorage: () => ({
-    saveMessages: vi.fn(),
-    loadMessages: vi.fn(() => null),
-    deleteThread: vi.fn(),
-    clearExpired: vi.fn(),
-    getAllThreadIds: vi.fn(() => []),
-    getTimeRemaining: vi.fn(() => null),
-  }),
+  useConversationStorage: () => mockStorage,
+  getStoredActiveThreadId: getStoredActiveThreadIdMock,
+  getLatestStoredThreadId: getLatestStoredThreadIdMock,
 }));
 
 // Mock uuid
@@ -45,6 +69,35 @@ vi.mock('uuid', () => ({
 describe('useAgentChat', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    activeThreadId = 'test-uuid-123';
+    threadMessages = new Map<string, Message[]>();
+
+    getStoredActiveThreadIdMock.mockReturnValue(null);
+    getLatestStoredThreadIdMock.mockReturnValue(null);
+
+    mockStorage.setActiveThreadId.mockImplementation((threadId: string) => {
+      activeThreadId = threadId;
+    });
+    mockStorage.saveMessagesForThread.mockImplementation(
+      (threadId: string, messages: Message[]) => {
+        threadMessages.set(threadId, messages);
+      }
+    );
+    mockStorage.saveMessages.mockImplementation((messages: Message[]) => {
+      threadMessages.set(activeThreadId, messages);
+    });
+    mockStorage.loadMessages.mockImplementation(() => threadMessages.get(activeThreadId) || null);
+    mockStorage.loadMessagesForThread.mockImplementation(
+      (threadId: string) => threadMessages.get(threadId) || null
+    );
+    mockStorage.deleteThread.mockImplementation(() => {
+      threadMessages.delete(activeThreadId);
+    });
+    mockStorage.deleteThreadById.mockImplementation((threadId: string) => {
+      threadMessages.delete(threadId);
+    });
+
+    mockStorage.subscribeToStorageEvents.mockImplementation(() => () => {});
     vi.spyOn(console, 'debug').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -61,6 +114,7 @@ describe('useAgentChat', () => {
       expect(result.current.isLoading).toBe(false);
       expect(result.current.streamingMessage).toBeNull();
       expect(result.current.error).toBeNull();
+      expect(result.current.splashSuggestions.length).toBeGreaterThan(0);
     });
 
     it('should use provided initial thread ID', () => {
@@ -74,6 +128,86 @@ describe('useAgentChat', () => {
 
       expect(result.current.threadId).toBe('test-uuid-123');
     });
+
+    it('should restore thread id from persisted active thread first', () => {
+      getStoredActiveThreadIdMock.mockReturnValue('persisted-active-thread');
+
+      const { result } = renderHook(() => useAgentChat());
+
+      expect(result.current.threadId).toBe('persisted-active-thread');
+    });
+
+    it('should fallback to latest stored thread id when active thread is missing', () => {
+      getStoredActiveThreadIdMock.mockReturnValue(null);
+      getLatestStoredThreadIdMock.mockReturnValue('latest-thread-id');
+
+      const { result } = renderHook(() => useAgentChat());
+
+      expect(result.current.threadId).toBe('latest-thread-id');
+    });
+
+    it('should rehydrate messages from storage for current thread', () => {
+      mockStorage.loadMessages.mockReturnValue([
+        {
+          id: 'stored-1',
+          role: 'assistant',
+          content: 'Restored message',
+          timestamp: new Date(),
+        },
+      ]);
+
+      const { result } = renderHook(() => useAgentChat());
+
+      expect(result.current.messages).toHaveLength(1);
+      expect(result.current.messages[0].content).toBe('Restored message');
+    });
+  });
+
+  describe('cross-tab sync', () => {
+    it('should switch thread when active-thread storage event is received', () => {
+      let listener: ((event: { type: string; threadId?: string }) => void) | undefined;
+      mockStorage.subscribeToStorageEvents.mockImplementation(
+        (cb: (event: StorageSyncEvent) => void) => {
+          listener = cb;
+          return () => {};
+        }
+      );
+
+      const { result } = renderHook(() => useAgentChat());
+
+      act(() => {
+        listener?.({ type: 'active-thread-changed', threadId: 'remote-thread' });
+      });
+
+      expect(result.current.threadId).toBe('remote-thread');
+    });
+
+    it('should sync messages when thread-updated event matches active thread', () => {
+      let listener: ((event: { type: string; threadId?: string }) => void) | undefined;
+      mockStorage.subscribeToStorageEvents.mockImplementation(
+        (cb: (event: StorageSyncEvent) => void) => {
+          listener = cb;
+          return () => {};
+        }
+      );
+      mockStorage.loadMessages.mockReturnValue([
+        {
+          id: 'synced-1',
+          role: 'assistant',
+          content: 'Synced from tab',
+          timestamp: new Date(),
+        },
+      ]);
+
+      const { result } = renderHook(() => useAgentChat({ initialThreadId: 'sync-thread' }));
+
+      act(() => {
+        listener?.({ type: 'thread-updated', threadId: 'sync-thread' });
+      });
+
+      expect(result.current.messages).toHaveLength(1);
+      expect(result.current.messages[0].content).toBe('Synced from tab');
+    });
   });
 
   describe('sendMessage', () => {
@@ -85,6 +219,7 @@ describe('useAgentChat', () => {
           type: 'complete',
           answer: 'Test answer',
           sources: [{ title: 'Test', url: 'https://example.com', metadata: {} }],
+          suggested_questions: ['What should I do first?'],
           thread_id: 'thread-123',
         });
       });
@@ -100,6 +235,28 @@ describe('useAgentChat', () => {
       expect(result.current.messages[0].content).toBe('Hello');
       expect(result.current.messages[1].role).toBe('assistant');
       expect(result.current.messages[1].content).toBe('Test answer');
+      expect(result.current.messages[1].suggestedQuestions).toEqual(['What should I do first?']);
+    });
+
+    it('should apply localized fallback suggestions when stream complete has none', async () => {
+      vi.mocked(agentService.askStream).mockImplementation(async (_params, onEvent) => {
+        onEvent({
+          type: 'complete',
+          answer: 'Respuesta de prueba',
+          sources: [],
+          thread_id: 'thread-456',
+        });
+      });
+
+      const { result } = renderHook(() => useAgentChat({ language: 'es' }));
+
+      await act(async () => {
+        await result.current.sendMessage('Necesito apoyo');
+      });
+
+      expect(result.current.messages[1].role).toBe('assistant');
+      expect(result.current.messages[1].suggestedQuestions?.length).toBeGreaterThan(0);
+      expect((result.current.messages[1].suggestedQuestions || [])[0]).toMatch(/^¿/);
     });
 
     it('should update streaming message during processing', async () => {

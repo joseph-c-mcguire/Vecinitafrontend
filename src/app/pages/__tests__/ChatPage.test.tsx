@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import ChatPage from '../ChatPage';
-import { useAgentChat } from '../../hooks/useAgentChat';
+import { useChatState } from '../../context/ChatStateContext';
 import { AgentServiceError } from '../../services/agentService';
 
-type UseAgentChatState = ReturnType<typeof useAgentChat>;
+type UseAgentChatState = ReturnType<typeof useChatState>;
 
 vi.mock('../../context/LanguageContext', () => ({
   useLanguage: () => ({
@@ -17,6 +17,8 @@ vi.mock('../../context/LanguageContext', () => ({
         appSubtitle: 'Environmental & Community Information Assistant',
         newChat: 'New chat',
         welcomeMessage: 'Welcome to Vecinita',
+        suggestionsStartLabel: 'Try one of these to get started',
+        suggestionsFollowupLabel: 'Suggested follow-up questions',
         typePlaceholder: 'Type your question...',
         sendMessage: 'Send message',
         'error.title': 'Error',
@@ -27,16 +29,7 @@ vi.mock('../../context/LanguageContext', () => ({
   }),
 }));
 
-vi.mock('../../hooks/useBackendSettings', () => ({
-  useBackendSettings: () => ({
-    selectedLLM: {
-      provider: 'groq',
-      model: 'llama-3.1-8b-instant',
-    },
-  }),
-}));
-
-vi.mock('../../hooks/useAgentChat');
+vi.mock('../../context/ChatStateContext');
 
 vi.mock('../../components/ChatMessage', () => ({
   ChatMessage: ({ message }: { message: { content: string } }) => (
@@ -70,6 +63,7 @@ describe('ChatPage', () => {
     streamProgress: { stage: 'Working', percent: 0, waiting: false, status: 'working' },
     pendingClarification: null,
     error: null,
+    splashSuggestions: ['What environmental concerns can I report in my neighborhood?'],
     sendMessage: mockSendMessage,
     loadThread: mockLoadThread,
     clearThread: mockClearThread,
@@ -82,8 +76,8 @@ describe('ChatPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    Element.prototype.scrollIntoView = vi.fn();
-    vi.mocked(useAgentChat).mockReturnValue(createHookState());
+    Element.prototype.scrollTo = vi.fn();
+    vi.mocked(useChatState).mockReturnValue(createHookState());
     mockSendMessage.mockResolvedValue(undefined);
   });
 
@@ -97,7 +91,7 @@ describe('ChatPage', () => {
   });
 
   it('renders existing conversation messages and hides the welcome state', () => {
-    vi.mocked(useAgentChat).mockReturnValue(
+    vi.mocked(useChatState).mockReturnValue(
       createHookState({
         messages: [
           {
@@ -122,6 +116,73 @@ describe('ChatPage', () => {
     expect(screen.getByText('Can you help me find a doctor?')).toBeInTheDocument();
     expect(screen.getByText('Here are a few clinics near you.')).toBeInTheDocument();
     expect(screen.queryByText('Welcome to Vecinita')).not.toBeInTheDocument();
+  });
+
+  it('renders assistant response and follow-up suggestions together', () => {
+    vi.mocked(useChatState).mockReturnValue(
+      createHookState({
+        messages: [
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Here are a few clinics near you.',
+            suggestedQuestions: ['What should I do first?'],
+            timestamp: new Date(),
+          },
+        ],
+      })
+    );
+
+    render(<ChatPage />);
+
+    expect(screen.getByText('Here are a few clinics near you.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'What should I do first?' })).toBeInTheDocument();
+  });
+
+  it('clicking a follow-up suggestion sends message without clearing visible response', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useChatState).mockReturnValue(
+      createHookState({
+        messages: [
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: 'Here are a few clinics near you.',
+            suggestedQuestions: ['What should I do first?'],
+            timestamp: new Date(),
+          },
+        ],
+      })
+    );
+
+    render(<ChatPage />);
+
+    await user.click(screen.getByRole('button', { name: 'What should I do first?' }));
+
+    expect(mockSendMessage).toHaveBeenCalledWith('What should I do first?');
+    expect(screen.getByText('Here are a few clinics near you.')).toBeInTheDocument();
+  });
+
+  it('does not render follow-up suggestions when assistant response is empty', () => {
+    vi.mocked(useChatState).mockReturnValue(
+      createHookState({
+        messages: [
+          {
+            id: 'assistant-1',
+            role: 'assistant',
+            content: '   ',
+            suggestedQuestions: ['What should I do first?'],
+            timestamp: new Date(),
+          },
+        ],
+      })
+    );
+
+    render(<ChatPage />);
+
+    expect(
+      screen.queryByRole('button', { name: 'What should I do first?' })
+    ).not.toBeInTheDocument();
   });
 
   it('sends a message from submit button and clears textarea', async () => {
@@ -163,7 +224,7 @@ describe('ChatPage', () => {
 
   it('does not submit empty messages and disables submit while loading', async () => {
     const user = userEvent.setup();
-    vi.mocked(useAgentChat).mockReturnValue({
+    vi.mocked(useChatState).mockReturnValue({
       ...createHookState(),
       isLoading: true,
     });
@@ -188,8 +249,74 @@ describe('ChatPage', () => {
     expect(mockClearThread).toHaveBeenCalled();
   });
 
+  it('does not force auto-scroll when user scrolled away from bottom', () => {
+    const { rerender, container } = render(<ChatPage />);
+    const messagesContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
+
+    Object.defineProperty(messagesContainer, 'scrollHeight', {
+      value: 1200,
+      configurable: true,
+    });
+    Object.defineProperty(messagesContainer, 'clientHeight', {
+      value: 300,
+      configurable: true,
+    });
+    Object.defineProperty(messagesContainer, 'scrollTop', {
+      value: 100,
+      configurable: true,
+      writable: true,
+    });
+
+    act(() => {
+      messagesContainer.dispatchEvent(new Event('scroll'));
+    });
+    vi.mocked(Element.prototype.scrollTo).mockClear();
+
+    vi.mocked(useChatState).mockReturnValue(
+      createHookState({
+        streamingMessage: 'Thinking...',
+      })
+    );
+    rerender(<ChatPage />);
+
+    expect(Element.prototype.scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('continues auto-scroll when user is near bottom', () => {
+    const { rerender, container } = render(<ChatPage />);
+    const messagesContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
+
+    Object.defineProperty(messagesContainer, 'scrollHeight', {
+      value: 1200,
+      configurable: true,
+    });
+    Object.defineProperty(messagesContainer, 'clientHeight', {
+      value: 300,
+      configurable: true,
+    });
+    Object.defineProperty(messagesContainer, 'scrollTop', {
+      value: 890,
+      configurable: true,
+      writable: true,
+    });
+
+    act(() => {
+      messagesContainer.dispatchEvent(new Event('scroll'));
+    });
+    vi.mocked(Element.prototype.scrollTo).mockClear();
+
+    vi.mocked(useChatState).mockReturnValue(
+      createHookState({
+        streamingMessage: 'Thinking...',
+      })
+    );
+    rerender(<ChatPage />);
+
+    expect(Element.prototype.scrollTo).toHaveBeenCalled();
+  });
+
   it('renders clarification prompt and questions when pending clarification exists', () => {
-    vi.mocked(useAgentChat).mockReturnValue({
+    vi.mocked(useChatState).mockReturnValue({
       ...createHookState(),
       pendingClarification: {
         originalQuestion: 'Please clarify your neighborhood',
@@ -211,7 +338,7 @@ describe('ChatPage', () => {
   });
 
   it('renders latest backend progress hint while loading', () => {
-    vi.mocked(useAgentChat).mockReturnValue({
+    vi.mocked(useChatState).mockReturnValue({
       ...createHookState(),
       isLoading: true,
       progressMessages: ['Searching', 'Scoring documents'],
@@ -228,7 +355,7 @@ describe('ChatPage', () => {
   });
 
   it('prefers the active streaming message over older progress hints', () => {
-    vi.mocked(useAgentChat).mockReturnValue({
+    vi.mocked(useChatState).mockReturnValue({
       ...createHookState(),
       isLoading: true,
       streamingMessage: 'Looking through local clinic resources...',
@@ -245,7 +372,7 @@ describe('ChatPage', () => {
 
   it('renders error and retries last message when clicking Retry', async () => {
     const user = userEvent.setup();
-    vi.mocked(useAgentChat).mockReturnValue({
+    vi.mocked(useChatState).mockReturnValue({
       ...createHookState(),
       error: new AgentServiceError('Request failed', undefined, 'NETWORK_ERROR'),
     });

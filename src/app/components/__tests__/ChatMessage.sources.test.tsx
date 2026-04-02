@@ -153,4 +153,51 @@ describe('ChatMessage source attribution', () => {
       screen.getByRole('link', { name: /Source 1: Community Clinic Directory/i })
     ).toHaveAttribute('href', 'https://clinic.example.org/directory');
   });
+
+  it('renders environmental reporting answer format with links and unverified placeholders', () => {
+    render(
+      <ChatMessage
+        message={{
+          id: 'assistant-env-1',
+          role: 'assistant',
+          content:
+            'Based on the retrieved context, you can report environmental concerns in your neighborhood through VECINA (https://vecina.wrwc.org/).\n\nAdditionally, you can also report environmental concerns through the Woonasquatucket River Watershed Council (WRWC) ([1] https://wrwc.org/).\n\nThey have resources including neighborhood gardens ([2] [unverified link removed]).\n\nSources:\n[1]\nLink: https://wrwc.org/neighborhood-gardens/\n[2]\nVECINA',
+          timestamp: new Date(),
+          sources: [
+            {
+              title: 'WRWC Neighborhood Gardens',
+              url: 'https://wrwc.org/neighborhood-gardens/',
+              snippet: 'Neighborhood gardens resource page.',
+            },
+            {
+              title: 'VECINA',
+              url: 'https://vecina.wrwc.org/',
+            },
+          ],
+        }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'https://vecina.wrwc.org/' })).toHaveAttribute(
+      'href',
+      'https://vecina.wrwc.org/'
+    );
+    expect(screen.getByRole('link', { name: 'https://wrwc.org/' })).toHaveAttribute(
+      'href',
+      'https://wrwc.org/'
+    );
+    expect(
+      screen.getByRole('link', { name: 'https://wrwc.org/neighborhood-gardens/' })
+    ).toHaveAttribute('href', 'https://wrwc.org/neighborhood-gardens/');
+
+    expect(screen.getByText(/unverified link removed/i)).toBeInTheDocument();
+
+    expect(
+      screen.getByRole('link', { name: /Source 1: WRWC Neighborhood Gardens/i })
+    ).toHaveAttribute('href', 'https://wrwc.org/neighborhood-gardens/');
+    expect(screen.getByRole('link', { name: /Source 2: VECINA/i })).toHaveAttribute(
+      'href',
+      'https://vecina.wrwc.org/'
+    );
+  });
 });

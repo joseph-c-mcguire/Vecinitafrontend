@@ -20,7 +20,13 @@
  * - ``VITE_AGENT_DEBUG`` — set to ``'true'`` to emit debug CustomEvents
  */
 
-import type { AgentResponse, AgentConfig, AskQueryParams, StreamEvent } from '../types/agent';
+import type {
+  AgentResponse,
+  AgentConfig,
+  AskQueryParams,
+  StreamEvent,
+  StreamEventComplete,
+} from '../types/agent';
 
 // Get gateway URL from environment or fallback to localhost
 // In development with Vite proxy, use /api prefix
@@ -444,6 +450,9 @@ class AgentServiceClient {
     if (params.thread_id) {
       url.searchParams.append('thread_id', params.thread_id);
     }
+    if (params.context_answer) {
+      url.searchParams.append('context_answer', params.context_answer);
+    }
     if (params.lang) {
       url.searchParams.append('lang', params.lang);
     }
@@ -510,6 +519,9 @@ class AgentServiceClient {
     if (params.thread_id) {
       url.searchParams.append('thread_id', params.thread_id);
     }
+    if (params.context_answer) {
+      url.searchParams.append('context_answer', params.context_answer);
+    }
     if (params.lang) {
       url.searchParams.append('lang', params.lang);
     }
@@ -572,6 +584,19 @@ class AgentServiceClient {
             thread_id: params.thread_id,
             eventCount,
           });
+        }
+
+        if (data.type === 'complete') {
+          const complete = data as StreamEventComplete;
+          const rawSuggestions = complete.suggested_questions ?? complete.suggestedQuestions;
+
+          if (Array.isArray(rawSuggestions)) {
+            complete.suggestedQuestions = rawSuggestions.filter(
+              (item): item is string => typeof item === 'string' && item.trim().length > 0
+            );
+          }
+
+          data = complete;
         }
 
         try {

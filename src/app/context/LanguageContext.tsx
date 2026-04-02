@@ -54,6 +54,14 @@ const translations: Translations = {
     en: "Hello! I'm Vecinita, your environmental and community information assistant. I can help you find information about environmental and community topics. Ask me anything!",
     es: '¡Hola! Soy Vecinita, tu asistente de información ambiental y comunitaria. Puedo ayudarte a encontrar información sobre temas ambientales y comunitarios. ¡Pregúntame lo que quieras!',
   },
+  suggestionsStartLabel: {
+    en: 'Try one of these to get started',
+    es: 'Prueba una de estas para comenzar',
+  },
+  suggestionsFollowupLabel: {
+    en: 'Suggested follow-up questions',
+    es: 'Preguntas sugeridas para continuar',
+  },
   newChat: {
     en: 'New chat',
     es: 'Nuevo chat',

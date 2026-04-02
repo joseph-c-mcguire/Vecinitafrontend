@@ -4,6 +4,7 @@ import { LanguageProvider } from './context/LanguageContext';
 import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
 import { BackendSettingsProvider } from './context/BackendSettingsContext';
 import { AuthProvider } from './context/AuthContext';
+import { ChatStateProvider } from './context/ChatStateContext';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
 import { SkipToContent } from './components/SkipToContent';
@@ -94,7 +95,9 @@ export default function App(): JSX.Element {
         <AccessibilityProvider>
           <BackendSettingsProvider>
             <AuthProvider>
-              <AppShell />
+              <ChatStateProvider>
+                <AppShell />
+              </ChatStateProvider>
             </AuthProvider>
           </BackendSettingsProvider>
         </AccessibilityProvider>

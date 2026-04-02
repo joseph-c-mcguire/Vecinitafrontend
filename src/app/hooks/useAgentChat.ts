@@ -8,8 +8,14 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { agentService, AgentServiceError } from '../services/agentService';
-import { useConversationStorage, type Message } from './useConversationStorage';
+import {
+  useConversationStorage,
+  getStoredActiveThreadId,
+  getLatestStoredThreadId,
+  type Message,
+} from './useConversationStorage';
 import type { StreamEvent, AgentSource, AskQueryParams, AgentResponse } from '../types/agent';
+import { getFallbackSuggestions, normalizeSuggestedQuestions } from '../lib/suggestions';
 
 interface UseAgentChatOptions {
   initialThreadId?: string;
@@ -84,7 +90,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     },
     [chatDebugEnabled]
   );
-  const [threadId, setThreadId] = useState<string>(initialThreadId || uuidv4());
+  const [threadId, setThreadId] = useState<string>(() => {
+    if (initialThreadId) {
+      return initialThreadId;
+    }
+    return getStoredActiveThreadId() || getLatestStoredThreadId() || uuidv4();
+  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState<string | null>(null);
@@ -100,6 +111,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
   });
 
   const storage = useConversationStorage(threadId);
+  const splashSuggestions = useMemo(() => getFallbackSuggestions(locale, 'splash'), [locale]);
 
   const appendProgressMessage = useCallback((message: string) => {
     const value = (message || '').trim();
@@ -168,15 +180,54 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       .join(' ');
   }, []);
 
+  // Keep one active-thread pointer so route changes/reloads restore the same conversation.
+  useEffect(() => {
+    storage.setActiveThreadId(threadId);
+    debugLog('thread:active_set', { threadId });
+  }, [threadId, storage, debugLog]);
+
   /**
    * Load conversation history from localStorage on mount or thread change.
    */
   useEffect(() => {
     const loadedMessages = storage.loadMessages();
-    if (loadedMessages) {
-      setMessages(loadedMessages);
-    }
-  }, [storage]);
+    setMessages(loadedMessages || []);
+    debugLog('thread:rehydrate', {
+      threadId,
+      restoredMessageCount: loadedMessages?.length || 0,
+    });
+  }, [storage, threadId, debugLog]);
+
+  // Sync local in-memory state when another tab updates chat storage.
+  useEffect(() => {
+    return storage.subscribeToStorageEvents((event) => {
+      if (event.type === 'active-thread-changed' && event.threadId && event.threadId !== threadId) {
+        debugLog('storage:event_active_thread_changed', {
+          fromThreadId: threadId,
+          toThreadId: event.threadId,
+        });
+        setThreadId(event.threadId);
+        return;
+      }
+
+      if (event.threadId !== threadId) {
+        return;
+      }
+
+      if (event.type === 'thread-deleted') {
+        debugLog('storage:event_thread_deleted', { threadId });
+        setMessages([]);
+        return;
+      }
+
+      const syncedMessages = storage.loadMessages() || [];
+      debugLog('storage:event_thread_updated', {
+        threadId,
+        syncedMessageCount: syncedMessages.length,
+      });
+      setMessages(syncedMessages);
+    });
+  }, [storage, threadId, debugLog]);
 
   /**
    * Convert agent sources to message sources format.
@@ -189,6 +240,17 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     }));
   };
 
+  const resolveFollowUpSuggestions = useCallback(
+    (rawSuggestions?: string[]) => {
+      const normalized = normalizeSuggestedQuestions(rawSuggestions);
+      if (normalized.length > 0) {
+        return normalized;
+      }
+      return getFallbackSuggestions(locale, 'followup');
+    },
+    [locale]
+  );
+
   /**
    * Send a message and get a streaming response.
    */
@@ -200,6 +262,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       setError(null);
       setStreamingMessage(copy.connecting);
       setProgressMessages([]);
+      setPendingClarification(null);
       setStreamProgress({
         stage: 'Connecting',
         percent: 5,
@@ -218,7 +281,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
       let workingMessages = [...messages, userMessage];
       setMessages(workingMessages);
-      storage.saveMessages(workingMessages);
+      storage.saveMessagesForThread(threadId, workingMessages);
 
       const appendAssistantEventMessage = (content: string) => {
         const value = content.trim();
@@ -235,13 +298,17 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
         workingMessages = [...workingMessages, eventMessage];
         setMessages(workingMessages);
-        storage.saveMessages(workingMessages);
+        storage.saveMessagesForThread(threadId, workingMessages);
       };
 
       const activeClarification = pendingClarification;
+      const lastAssistantContext = [...messages]
+        .reverse()
+        .find((message) => message.role === 'assistant' && message.content?.trim())?.content;
       const requestParams: AskQueryParams = {
         question: activeClarification?.originalQuestion || question,
         thread_id: threadId,
+        context_answer: lastAssistantContext,
         lang: language,
         provider,
         model,
@@ -261,6 +328,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
         let streamEventCount = 0;
         let sawCompleteEvent = false;
         let sawClarificationEvent = false;
+        let assistantSuggestedQuestions: string[] = [];
 
         const updateProgressFromEvent = (event: {
           stage?: string;
@@ -322,6 +390,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               sawCompleteEvent = true;
               assistantContent = event.answer;
               assistantSources = event.sources || assistantSources;
+              assistantSuggestedQuestions = resolveFollowUpSuggestions(
+                event.suggestedQuestions || event.suggested_questions
+              );
               setPendingClarification(null);
               if (event.thread_id) {
                 newThreadId = event.thread_id;
@@ -409,6 +480,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           const fallbackResponse = await serviceClient.ask(requestParams);
           assistantContent = fallbackResponse.answer || '';
           assistantSources = fallbackResponse.sources || assistantSources;
+          assistantSuggestedQuestions = resolveFollowUpSuggestions(
+            fallbackResponse.suggested_questions
+          );
           if (fallbackResponse.thread_id) {
             newThreadId = fallbackResponse.thread_id;
           }
@@ -444,19 +518,18 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
             role: 'assistant',
             content: assistantContent,
             sources: mapSources(assistantSources),
+            suggestedQuestions: assistantSuggestedQuestions,
             timestamp: new Date(),
           };
           finalMessages = [...finalMessages, assistantMessage];
           setMessages(finalMessages);
         }
 
-        // Update thread ID if it changed
+        // Update thread ID if it changed and persist on the correct thread key.
         if (newThreadId !== threadId) {
           setThreadId(newThreadId);
         }
-
-        // Save to localStorage (will use updated threadId due to useEffect)
-        storage.saveMessages(finalMessages);
+        storage.saveMessagesForThread(newThreadId, finalMessages);
         debugLog('sendMessage:success', {
           question,
           threadId,
@@ -482,6 +555,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               role: 'assistant',
               content: fallbackAnswer,
               sources: mapSources(fallbackResponse.sources || []),
+              suggestedQuestions: resolveFollowUpSuggestions(fallbackResponse.suggested_questions),
               timestamp: new Date(),
             };
             fallbackMessages = [...fallbackMessages, fallbackAssistantMessage];
@@ -502,7 +576,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           }
 
           setError(null);
-          storage.saveMessages(fallbackMessages);
+          storage.saveMessagesForThread(fallbackResponse.thread_id || threadId, fallbackMessages);
           debugLog('sendMessage:fallback_success', {
             question,
             threadId,
@@ -536,7 +610,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
         const finalMessages = [...workingMessages, errorMessage];
         setMessages(finalMessages);
-        storage.saveMessages(finalMessages);
+        storage.saveMessagesForThread(threadId, finalMessages);
       } finally {
         setIsLoading(false);
         setStreamingMessage(null);
@@ -568,28 +642,40 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       copy.generating,
       copy.toolSummaryTitle,
       copy.unexpectedError,
+      resolveFollowUpSuggestions,
     ]
   );
 
   /**
    * Load an existing thread by ID.
    */
-  const loadThread = useCallback((newThreadId: string) => {
-    setThreadId(newThreadId);
-    // Messages will be loaded by useEffect
-  }, []);
+  const loadThread = useCallback(
+    (newThreadId: string) => {
+      setThreadId(newThreadId);
+      storage.setActiveThreadId(newThreadId);
+      debugLog('thread:manual_load', { newThreadId });
+    },
+    [storage, debugLog]
+  );
 
   /**
    * Start a completely new conversation — new thread ID, clear messages.
    * Never calls any API or Supabase. Everything stays in localStorage.
    */
   const startNewConversation = useCallback(() => {
-    storage.deleteThread();
+    storage.deleteThreadById(threadId);
     setMessages([]);
-    setThreadId(uuidv4());
+    const nextThreadId = uuidv4();
+    setThreadId(nextThreadId);
+    storage.setActiveThreadId(nextThreadId);
+    debugLog('thread:new_conversation_started', {
+      deletedThreadId: threadId,
+      nextThreadId,
+    });
     setError(null);
     setStreamingMessage(null);
-  }, [storage]);
+    setPendingClarification(null);
+  }, [storage, threadId, debugLog]);
 
   /**
    * Clear the current thread and start fresh.
@@ -609,12 +695,12 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       // Remove last assistant message if it was an error
       const filteredMessages = messages.slice(0, -1);
       setMessages(filteredMessages);
-      storage.saveMessages(filteredMessages);
+      storage.saveMessagesForThread(threadId, filteredMessages);
 
       // Resend the question
       sendMessage(lastUserMessage.content);
     }
-  }, [messages, storage, sendMessage]);
+  }, [messages, storage, sendMessage, threadId]);
 
   return {
     threadId,
@@ -625,6 +711,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     progressMessages,
     streamProgress,
     pendingClarification,
+    splashSuggestions,
     sendMessage,
     loadThread,
     clearThread,
