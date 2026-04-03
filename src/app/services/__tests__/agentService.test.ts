@@ -253,6 +253,26 @@ describe('AgentServiceClient', () => {
       locationSpy.mockRestore();
     });
 
+    it('should bypass an absolute Render gateway host and use the direct agent host', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('https://vecinita-gateway.onrender.com/api/v1');
+
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ answer: 'ok', sources: [] }));
+
+      await renderClient.ask({ question: 'hello' });
+
+      const callUrl = String(fetchMock.mock.calls[0]?.[0]);
+      expect(callUrl).toContain('https://vecinita-agent.onrender.com/ask');
+      expect(callUrl).not.toContain('vecinita-gateway.onrender.com');
+
+      locationSpy.mockRestore();
+    });
+
     it('should handle HTTP error', async () => {
       vi.mocked(fetch).mockResolvedValueOnce(
         new Response('Server error', {
@@ -506,6 +526,31 @@ describe('AgentServiceClient', () => {
       } as Location);
 
       const renderClient = new AgentServiceClient('https://vecinita-agent.onrender.com/api/v1');
+      const mockConfig: AgentConfig = {
+        providers: [{ name: 'ollama', models: ['llama3.1:8b'], default: true }],
+        models: { ollama: ['llama3.1:8b'] },
+      };
+
+      vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(mockConfig));
+
+      const result = await renderClient.getConfig();
+
+      expect(result).toMatchObject(mockConfig);
+      expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+        'https://vecinita-agent.onrender.com/config'
+      );
+
+      locationSpy.mockRestore();
+    });
+
+    it('should use direct agent /config when configured with an absolute Render gateway URL', async () => {
+      const locationSpy = vi.spyOn(window, 'location', 'get').mockReturnValue({
+        hostname: 'vecinita-frontend.onrender.com',
+        origin: 'https://vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      } as Location);
+
+      const renderClient = new AgentServiceClient('https://vecinita-gateway.onrender.com/api/v1');
       const mockConfig: AgentConfig = {
         providers: [{ name: 'ollama', models: ['llama3.1:8b'], default: true }],
         models: { ollama: ['llama3.1:8b'] },

@@ -50,6 +50,31 @@ function isDirectRenderAgentHost(hostname: string): boolean {
   return hostname.endsWith('.onrender.com') && hostname.includes('-agent');
 }
 
+function isRenderFrontendHost(hostname: string): boolean {
+  return hostname.endsWith('.onrender.com') && hostname.includes('-frontend');
+}
+
+function getPreferredRenderAgentBaseUrl(currentHost: string, protocol: string): string | null {
+  const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || '').trim();
+
+  if (/^https?:\/\//i.test(configuredBackendUrl)) {
+    try {
+      const parsed = new URL(configuredBackendUrl);
+      if (isDirectRenderAgentHost(parsed.hostname)) {
+        return configuredBackendUrl;
+      }
+    } catch {
+      // Ignore malformed overrides and fall back to hostname inference.
+    }
+  }
+
+  if (!isRenderFrontendHost(currentHost)) {
+    return null;
+  }
+
+  return `${protocol}//${currentHost.replace('-frontend', '-agent')}`;
+}
+
 /**
  * Strip the gateway path prefix from a URL pathname when talking directly
  * to the agent service on Render.
@@ -99,18 +124,18 @@ function resolveGatewayUrl(rawUrl: string): string {
 
   const trimmedUrl = (rawUrl || '').trim();
   const currentHost = window.location.hostname;
+  const preferredRenderAgentBaseUrl = getPreferredRenderAgentBaseUrl(
+    currentHost,
+    window.location.protocol
+  );
   const isCurrentHostLocal =
     currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
 
   // On hosted environments, a relative /api URL can hit the static frontend server
-  // (returning HTML) instead of the agent API. Infer agent host on Render domains.
+  // (returning HTML) or a missing public gateway. Prefer the direct agent host.
   if (!isCurrentHostLocal && trimmedUrl.startsWith('/')) {
-    if (currentHost.endsWith('.onrender.com') && currentHost.includes('-frontend')) {
-      const inferredAgentHost = currentHost.replace('-frontend', '-agent');
-      const inferredBasePath = isDirectRenderAgentHost(inferredAgentHost)
-        ? stripGatewayPrefixForDirectAgent(trimmedUrl)
-        : trimmedUrl;
-      return `${window.location.protocol}//${inferredAgentHost}${inferredBasePath}`;
+    if (preferredRenderAgentBaseUrl) {
+      return preferredRenderAgentBaseUrl;
     }
     return trimmedUrl;
   }
@@ -121,12 +146,18 @@ function resolveGatewayUrl(rawUrl: string): string {
 
   try {
     const parsed = new URL(trimmedUrl);
+    const isRenderGatewayHost =
+      parsed.hostname.endsWith('.onrender.com') && parsed.hostname.includes('-gateway');
     const isConfiguredLocal =
       parsed.hostname === 'localhost' ||
       parsed.hostname === '127.0.0.1' ||
       parsed.hostname === '::1';
     const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
     const isStaleAbsoluteHost = parsed.hostname !== currentHost;
+
+    if (preferredRenderAgentBaseUrl && isRenderGatewayHost && isStaleAbsoluteHost) {
+      return preferredRenderAgentBaseUrl;
+    }
 
     if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
       parsed.hostname = currentHost;
