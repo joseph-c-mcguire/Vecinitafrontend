@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
 import { AccessibilityProvider, useAccessibility } from './context/AccessibilityContext';
 import { BackendSettingsProvider } from './context/BackendSettingsContext';
 import { AuthProvider } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import { ChatStateProvider } from './context/ChatStateContext';
 import { AccessibilityPanel } from './components/AccessibilityPanel';
 import { KeyboardShortcutsHelp } from './components/KeyboardShortcutsHelp';
@@ -12,6 +13,30 @@ import { NavBar } from './components/NavBar';
 import ChatPage from './pages/ChatPage';
 import DocumentsDashboard from './pages/DocumentsDashboard';
 import LoginPage from './pages/LoginPage';
+
+function AdminRoute({ children }: { children: JSX.Element }): JSX.Element {
+  const { user, isAdmin, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) {
+    return (
+      <main className="flex flex-1 items-center justify-center" aria-busy="true">
+        <p className="text-muted-foreground">Loading...</p>
+      </main>
+    );
+  }
+
+  if (!user) {
+    const redirect = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  return children;
+}
 
 // ── Shell — theme + accessibility overlays ─────────────────────────────────
 
@@ -67,6 +92,14 @@ function AppShell(): JSX.Element {
         <Routes>
           <Route path="/" element={<ChatPage />} />
           <Route path="/documents" element={<DocumentsDashboard />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <DocumentsDashboard />
+              </AdminRoute>
+            }
+          />
           <Route path="/login" element={<LoginPage />} />
           {/* Catch-all → chat */}
           <Route path="*" element={<ChatPage />} />

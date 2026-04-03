@@ -19,6 +19,7 @@ async function loginAsAdmin(page: Page): Promise<void> {
 test.describe('Journey Admin (J017-J026)', () => {
   test('J017 redirects unauthenticated admin access', async ({ page }) => {
     await page.goto('/admin');
+    await page.waitForURL(/\/login\?redirect=%2Fadmin/, { timeout: 30000 });
     await expect(page).toHaveURL(/\/login\?redirect=%2Fadmin/);
   });
 

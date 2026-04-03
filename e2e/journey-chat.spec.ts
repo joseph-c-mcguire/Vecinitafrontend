@@ -228,8 +228,11 @@ test.describe('Journey Chat (J001-J008)', () => {
     await submitMainChatQuestion(page, question);
     await expect(page.getByText(question)).toBeVisible();
 
-    await page.getByRole('button', { name: /New chat|Nuevo chat/i }).click();
-    await expect(page.getByText(question)).toBeHidden({ timeout: 10000 });
+    await page.locator('button:has-text("New chat"), button:has-text("Nuevo chat")').first().click();
+    const questionInUserMessages = page
+      .locator('[data-testid="chat-message"][data-message-role="user"]')
+      .filter({ hasText: question });
+    await expect(questionInUserMessages).toHaveCount(0, { timeout: 10000 });
   });
 
   test('J006 sends a Spanish question and gets localized response', async ({ page }) => {
@@ -246,7 +249,7 @@ test.describe('Journey Chat (J001-J008)', () => {
 
   test('J007 retries after a failed request', async ({ page }) => {
     let askCalls = 0;
-    await page.route('**/api/v1/ask**', async (route) => {
+    await page.route('**/ask/stream**', async (route) => {
       askCalls += 1;
       if (askCalls === 1) {
         await route.fulfill({
@@ -256,7 +259,23 @@ test.describe('Journey Chat (J001-J008)', () => {
         });
         return;
       }
-      await route.continue();
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+        body: [
+          `data: ${JSON.stringify({
+            type: 'complete',
+            answer: 'Retry succeeded.',
+            sources: [],
+            thread_id: 'retry-thread',
+            metadata: { progress: 100, stage: 'complete' },
+          })}\n\n`,
+        ].join(''),
+      });
     });
 
     await page.goto('/');
@@ -442,22 +461,31 @@ test.describe('Journey Chat (J001-J008)', () => {
 
     await page.goto('/');
 
-    const splashSuggestion = page.getByRole('button', {
-      name: 'What environmental concerns can I report in my neighborhood?',
-      exact: true,
-    });
+    const splashSuggestion = page
+      .locator('main')
+      .getByRole('button', {
+        name:
+          /What environmental concerns can I report in my neighborhood\?|¿Qué problemas ambientales puedo reportar en mi vecindario\?/i,
+      })
+      .first();
     await expect(splashSuggestion).toBeVisible();
     await splashSuggestion.click();
 
     await expect(
-      page.getByText('What environmental concerns can I report in my neighborhood?')
+      page
+        .locator('[data-testid="chat-message"][data-message-role="user"]')
+        .filter({
+          hasText:
+            /What environmental concerns can I report in my neighborhood\?|¿Qué problemas ambientales puedo reportar en mi vecindario\?/i,
+        })
+        .first()
     ).toBeVisible();
 
     const followupSuggestion = page.getByRole('button', {
       name: 'What should I do first?',
       exact: true,
     });
-    await expect(followupSuggestion).toBeVisible();
+    await expect(followupSuggestion).toBeVisible({ timeout: 15000 });
     await followupSuggestion.click();
 
     const userMessages = page

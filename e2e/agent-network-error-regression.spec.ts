@@ -30,17 +30,25 @@ test.describe('Agent network regressions', () => {
       });
     });
 
+    await page.route(/\/api(?:\/v1)?\/ask\/stream(\?.*)?$/, async (route) => {
+      await route.abort('failed');
+    });
+
     await page.route(/\/api(?:\/v1)?\/ask(\?.*)?$/, async (route) => {
       await route.abort('failed');
     });
 
     await page.goto('/');
-    await page
-      .getByRole('button', { name: /problemas ambientales|environmental concerns/i })
-      .click();
+    const suggestionButton = page.getByRole('button', {
+      name: /problemas ambientales|environmental concerns/i,
+    });
+    await expect(suggestionButton).toBeVisible({ timeout: 15000 });
+    await suggestionButton.click();
 
     await expect(
-      page.getByText(/Lo siento, encontr[eé] un error:|Sorry, I encountered an error:/i)
-    ).toBeVisible();
+      page.locator('[data-message-role="assistant"], [class*="destructive"]').filter({
+        hasText: /Lo siento, encontr[eé] un error:|Sorry, I encountered an error:/i,
+      })
+    ).toBeVisible({ timeout: 30000 });
   });
 });

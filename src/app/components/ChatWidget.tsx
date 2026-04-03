@@ -181,6 +181,7 @@ export function ChatWidget({
     return (
       <Button
         onClick={() => setIsOpen(true)}
+        data-testid="chat-widget-open"
         size="icon"
         className={`fixed ${positionClasses[position]} h-14 w-14 rounded-full shadow-lg transition-all hover:scale-110`}
         style={{
@@ -198,6 +199,7 @@ export function ChatWidget({
   return (
     <>
       <div
+        data-testid="chat-widget-panel"
         className={`fixed ${positionClasses[position]} flex flex-col shadow-2xl rounded-lg overflow-hidden border border-border transition-all ${
           isMinimized ? 'h-14' : 'h-[600px]'
         } w-[400px] max-w-[calc(100vw-2rem)]`}
@@ -354,6 +356,7 @@ export function ChatWidget({
             <div className="bg-card p-3">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <textarea
+                  data-testid="chat-widget-composer"
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -365,6 +368,7 @@ export function ChatWidget({
                   aria-label={t('typePlaceholder')}
                 />
                 <Button
+                  data-testid="chat-widget-send"
                   type="submit"
                   disabled={!input.trim() || isLoading}
                   size="icon"

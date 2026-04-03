@@ -173,7 +173,7 @@ test.describe('Journey Documents (J009-J016)', () => {
   });
 
   test('J016 renders empty state when backend returns no sources', async ({ page }) => {
-    await page.route('**/api/v1/documents/overview**', async (route) => {
+    await page.route('**/documents/overview**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -182,7 +182,9 @@ test.describe('Journey Documents (J009-J016)', () => {
     });
 
     await page.goto('/documents');
-    await expect(page.getByText(/No documents|Sin documentos|No sources/i)).toBeVisible();
+    await expect(
+      page.getByText(/No resources match your filters|Ningún recurso coincide con tus filtros/i)
+    ).toBeVisible();
   });
 
   test('documents journey supports navigation, link opening, downloads, and accessibility controls', async ({

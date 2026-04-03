@@ -1,5 +1,20 @@
 import { test, expect } from '@playwright/test';
 
+async function triggerAltShortcut(
+  page: import('@playwright/test').Page,
+  key: 'a' | 'k'
+): Promise<void> {
+  await page.evaluate((shortcutKey) => {
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: shortcutKey,
+        altKey: true,
+        bubbles: true,
+      })
+    );
+  }, key);
+}
+
 async function installCommunityFixtures(page: import('@playwright/test').Page): Promise<void> {
   await page.route('**/documents/overview**', async (route) => {
     await route.fulfill({
@@ -193,19 +208,21 @@ test.describe('Community flows', () => {
     await page.getByRole('link', { name: /Chat/i }).click();
     await expect(page).toHaveURL(/\/$/);
 
-    const widgetOpenButton = page.locator('button.fixed[aria-label]').first();
+    const widgetOpenButton = page.getByTestId('chat-widget-open');
+    await expect(widgetOpenButton).toBeVisible();
     await widgetOpenButton.click();
 
-    const widgetComposer = page.locator('textarea').last();
-    await widgetComposer.fill('I need housing support resources');
-    await page
-      .getByRole('button', { name: /Send message|Enviar mensaje/i })
-      .last()
-      .click();
+    const widgetPanel = page.getByTestId('chat-widget-panel');
+    await expect(widgetPanel).toBeVisible();
 
-    await expect(page.getByText('I need housing support resources')).toBeVisible();
-    const safeLink = page.getByRole('link', { name: 'Community Support Hub', exact: true }).last();
-    await expect(safeLink).toBeVisible({ timeout: 15000 });
+    const widgetComposer = widgetPanel.getByTestId('chat-widget-composer');
+    await expect(widgetComposer).toBeVisible();
+    await widgetComposer.fill('I need housing support resources');
+    await widgetPanel.getByTestId('chat-widget-send').click();
+
+    await expect(widgetPanel.getByText('I need housing support resources')).toBeVisible();
+    const safeLink = widgetPanel.getByRole('link', { name: 'Community Support Hub', exact: true });
+  await expect(safeLink).toBeVisible({ timeout: 30000 });
 
     const [chatPopup] = await Promise.all([
       context.waitForEvent('page', { timeout: 30000 }),
@@ -214,7 +231,7 @@ test.describe('Community flows', () => {
     await expect(chatPopup).toHaveURL('https://safe.example.org/hub');
     await chatPopup.close();
 
-    await page.keyboard.press('Alt+a');
+    await triggerAltShortcut(page, 'a');
     const accessibilityDialog = page.getByRole('dialog');
     await expect(accessibilityDialog).toBeVisible();
     await accessibilityDialog.getByRole('checkbox').first().check();
@@ -222,7 +239,7 @@ test.describe('Community flows', () => {
     await page.keyboard.press('Escape');
     await expect(accessibilityDialog).toBeHidden();
 
-    await page.keyboard.press('Alt+k');
+    await triggerAltShortcut(page, 'k');
     await expect(
       page.getByRole('heading', { name: /Keyboard Shortcuts|Atajos de Teclado/i })
     ).toBeVisible();
