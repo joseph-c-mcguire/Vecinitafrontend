@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import DocumentsDashboard from '../DocumentsDashboard';
+import DocumentsDashboard, { resolveApiBase } from '../DocumentsDashboard';
 
 function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -139,6 +139,45 @@ describe('DocumentsDashboard integration', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to load resources: HTTP 503')).toBeInTheDocument();
     });
+  });
+
+  it('renders resources when tags request fails but overview succeeds', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve(
+            jsonResponse({
+              sources: [
+                {
+                  url: 'https://example.org/partial',
+                  title: 'Partial Success Source',
+                  source_domain: 'example.org',
+                  tags: ['housing'],
+                },
+              ],
+            })
+          );
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve(new Response(null, { status: 503 }));
+        }
+
+        return Promise.resolve(new Response(null, { status: 404 }));
+      })
+    );
+
+    render(<DocumentsDashboard />);
+
+    await waitFor(() => {
+      expect(screen.getByText('Partial Success Source')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText(/Failed to load resources/i)).not.toBeInTheDocument();
+    expect(screen.getByText('No topics available yet.')).toBeInTheDocument();
   });
 
   it('renders an error state when overview returns HTML instead of JSON', async () => {
@@ -428,5 +467,18 @@ describe('DocumentsDashboard integration', () => {
     await waitFor(() => {
       expect(alertSpy).toHaveBeenCalledWith('Unable to resolve a download link (HTTP 500)');
     });
+  });
+
+  it('rewrites stale gateway hosts for Render frontends', () => {
+    expect(
+      resolveApiBase('http://localhost:8004/api/v1', {
+        hostname: 'vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      })
+    ).toBe('https://vecinita-gateway.onrender.com/api/v1');
+  });
+
+  it('preserves relative API paths for non-frontdoor hosts', () => {
+    expect(resolveApiBase('/api/v1', { hostname: 'localhost', protocol: 'http:' })).toBe('/api/v1');
   });
 });

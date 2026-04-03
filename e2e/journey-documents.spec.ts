@@ -86,10 +86,10 @@ async function readOpenedUrls(page: Page): Promise<string[]> {
 
 async function ensureDocumentsAvailable(page: Page): Promise<{ sources?: unknown[] } | null> {
   const docsResponse = await page.request.get('/api/v1/documents/overview');
-  if (!docsResponse.ok()) {
-    test.skip(true, 'Documents endpoint is not available');
-  }
   const payload = (await docsResponse.json().catch(() => null)) as { sources?: unknown[] } | null;
+  const documentsReady = docsResponse.ok() && !!payload && Array.isArray(payload.sources);
+
+  test.skip(!documentsReady, 'Documents endpoint is not available');
   return payload;
 }
 

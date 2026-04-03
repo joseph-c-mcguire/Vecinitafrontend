@@ -2,14 +2,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { ExternalLink, Link2, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
-function resolveApiBase(rawUrl: string): string {
+export function resolveApiBase(
+  rawUrl: string,
+  locationOverride?: { hostname: string; protocol: string }
+): string {
   const trimmedUrl = (rawUrl || '').trim().replace(/\/+$/, '');
 
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' && !locationOverride) {
     return trimmedUrl || rawUrl;
   }
 
-  const currentHost = window.location.hostname;
+  const runtimeLocation = locationOverride ?? window.location;
+  const currentHost = runtimeLocation.hostname;
   const isCurrentHostLocal =
     currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
   const inferredGatewayHost =
@@ -23,7 +27,7 @@ function resolveApiBase(rawUrl: string): string {
 
   if (trimmedUrl.startsWith('/')) {
     if (inferredGatewayHost !== currentHost) {
-      return `${window.location.protocol}//${inferredGatewayHost}${trimmedUrl}`;
+      return `${runtimeLocation.protocol}//${inferredGatewayHost}${trimmedUrl}`;
     }
     return trimmedUrl;
   }
@@ -39,6 +43,11 @@ function resolveApiBase(rawUrl: string): string {
 
     if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
       parsed.hostname = inferredGatewayHost;
+      // Render-hosted services terminate TLS on the default port.
+      if (inferredGatewayHost.endsWith('.onrender.com')) {
+        parsed.protocol = 'https:';
+        parsed.port = '';
+      }
       return parsed.toString().replace(/\/+$/, '');
     }
   } catch {
@@ -50,6 +59,7 @@ function resolveApiBase(rawUrl: string): string {
 
 const API_BASE = resolveApiBase(
   (import.meta.env.VITE_GATEWAY_URL as string | undefined) ||
+    (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
     (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1')
 );
 
