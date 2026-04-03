@@ -481,4 +481,22 @@ describe('DocumentsDashboard integration', () => {
   it('preserves relative API paths for non-frontdoor hosts', () => {
     expect(resolveApiBase('/api/v1', { hostname: 'localhost', protocol: 'http:' })).toBe('/api/v1');
   });
+
+  it('rewrites render agent hosts to gateway for documents API calls', () => {
+    expect(
+      resolveApiBase('https://vecinita-agent.onrender.com', {
+        hostname: 'vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      })
+    ).toBe('https://vecinita-gateway.onrender.com/api/v1');
+  });
+
+  it('normalizes render gateway root URLs to /api/v1', () => {
+    expect(
+      resolveApiBase('https://vecinita-gateway.onrender.com', {
+        hostname: 'vecinita-frontend.onrender.com',
+        protocol: 'https:',
+      })
+    ).toBe('https://vecinita-gateway.onrender.com/api/v1');
+  });
 });

@@ -34,12 +34,40 @@ export function resolveApiBase(
 
   try {
     const parsed = new URL(trimmedUrl || rawUrl);
+    const isRenderHost = parsed.hostname.endsWith('.onrender.com');
+    const isRenderAgentHost = isRenderHost && parsed.hostname.includes('-agent');
+    const isRenderGatewayHost = isRenderHost && parsed.hostname.includes('-gateway');
     const isConfiguredLocal =
       parsed.hostname === 'localhost' ||
       parsed.hostname === '127.0.0.1' ||
       parsed.hostname === '::1';
     const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
     const isStaleAbsoluteHost = parsed.hostname !== currentHost;
+
+    const normalizeGatewayPath = () => {
+      const path = parsed.pathname.replace(/\/+$/, '');
+      if (!path || path === '/' || path === '/api') {
+        parsed.pathname = '/api/v1';
+      }
+    };
+
+    // If frontend is configured to call a direct agent host on Render,
+    // rewrite to the public gateway host because documents endpoints live on gateway.
+    if (isRenderAgentHost) {
+      parsed.hostname = parsed.hostname.replace('-agent', '-gateway');
+      parsed.protocol = 'https:';
+      parsed.port = '';
+      normalizeGatewayPath();
+      return parsed.toString().replace(/\/+$/, '');
+    }
+
+    // Ensure hosted gateway URLs always include an API prefix.
+    if (isRenderGatewayHost) {
+      parsed.protocol = 'https:';
+      parsed.port = '';
+      normalizeGatewayPath();
+      return parsed.toString().replace(/\/+$/, '');
+    }
 
     if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
       parsed.hostname = inferredGatewayHost;
