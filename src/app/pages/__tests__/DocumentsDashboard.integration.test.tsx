@@ -499,4 +499,30 @@ describe('DocumentsDashboard integration', () => {
       })
     ).toBe('https://vecinita-gateway.onrender.com/api/v1');
   });
+
+  it('prefers explicit render backend fallback when gateway env is relative', () => {
+    expect(
+      resolveApiBase(
+        '/api',
+        {
+          hostname: 'vecinita-frontend.onrender.com',
+          protocol: 'https:',
+        },
+        'https://vecinita-gateway-prod-v5.onrender.com'
+      )
+    ).toBe('https://vecinita-gateway-prod-v5.onrender.com/api/v1');
+  });
+
+  it('normalizes render agent fallback host to gateway for documents routes', () => {
+    expect(
+      resolveApiBase(
+        '/api',
+        {
+          hostname: 'vecinita-frontend.onrender.com',
+          protocol: 'https:',
+        },
+        'https://vecinita-agent.onrender.com'
+      )
+    ).toBe('https://vecinita-gateway.onrender.com/api/v1');
+  });
 });

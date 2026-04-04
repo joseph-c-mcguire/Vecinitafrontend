@@ -4,9 +4,11 @@ import { useLanguage } from '../context/LanguageContext';
 
 export function resolveApiBase(
   rawUrl: string,
-  locationOverride?: { hostname: string; protocol: string }
+  locationOverride?: { hostname: string; protocol: string },
+  fallbackUrl?: string
 ): string {
   const trimmedUrl = (rawUrl || '').trim().replace(/\/+$/, '');
+  const trimmedFallbackUrl = (fallbackUrl || '').trim().replace(/\/+$/, '');
 
   if (typeof window === 'undefined' && !locationOverride) {
     return trimmedUrl || rawUrl;
@@ -25,7 +27,51 @@ export function resolveApiBase(
     return trimmedUrl || rawUrl;
   }
 
+  const normalizeAbsoluteGatewayUrl = (candidateUrl: string): string | null => {
+    if (!candidateUrl || !/^https?:\/\//i.test(candidateUrl)) {
+      return null;
+    }
+
+    try {
+      const parsed = new URL(candidateUrl);
+      const isRenderHost = parsed.hostname.endsWith('.onrender.com');
+      const isRenderAgentHost = isRenderHost && parsed.hostname.includes('-agent');
+      const isRenderGatewayHost = isRenderHost && parsed.hostname.includes('-gateway');
+
+      const normalizeGatewayPath = () => {
+        const path = parsed.pathname.replace(/\/+$/, '');
+        if (!path || path === '/' || path === '/api') {
+          parsed.pathname = '/api/v1';
+        }
+      };
+
+      if (isRenderAgentHost) {
+        parsed.hostname = parsed.hostname.replace('-agent', '-gateway');
+        parsed.protocol = 'https:';
+        parsed.port = '';
+        normalizeGatewayPath();
+        return parsed.toString().replace(/\/+$/, '');
+      }
+
+      if (isRenderGatewayHost) {
+        parsed.protocol = 'https:';
+        parsed.port = '';
+        normalizeGatewayPath();
+        return parsed.toString().replace(/\/+$/, '');
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  };
+
   if (trimmedUrl.startsWith('/')) {
+    const normalizedFallbackGateway = normalizeAbsoluteGatewayUrl(trimmedFallbackUrl);
+    if (normalizedFallbackGateway) {
+      return normalizedFallbackGateway;
+    }
+
     if (inferredGatewayHost !== currentHost) {
       return `${runtimeLocation.protocol}//${inferredGatewayHost}${trimmedUrl}`;
     }
@@ -87,8 +133,9 @@ export function resolveApiBase(
 
 const API_BASE = resolveApiBase(
   (import.meta.env.VITE_GATEWAY_URL as string | undefined) ||
-    (import.meta.env.VITE_BACKEND_URL as string | undefined) ||
-    (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1')
+    (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1'),
+  undefined,
+  import.meta.env.VITE_BACKEND_URL as string | undefined
 );
 
 interface Source {
