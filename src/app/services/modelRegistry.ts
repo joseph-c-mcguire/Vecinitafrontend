@@ -1,37 +1,5 @@
 // Model Registry Service - fetches available LLM and embedding models from backend services
-
-function resolveApiBase(rawUrl: string): string {
-  if (typeof window === 'undefined') {
-    return rawUrl;
-  }
-
-  const currentHost = window.location.hostname;
-  const isCurrentHostLocal =
-    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
-
-  if (isCurrentHostLocal) {
-    return rawUrl;
-  }
-
-  try {
-    const parsed = new URL(rawUrl);
-    const isConfiguredLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
-    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
-    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
-
-    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = currentHost;
-      return parsed.toString().replace(/\/+$/, '');
-    }
-  } catch {
-    return rawUrl;
-  }
-
-  return rawUrl;
-}
+import { resolveApiBase } from '../lib/apiBaseResolution';
 
 const API_BASE = resolveApiBase(
   import.meta.env.VITE_GATEWAY_URL ||

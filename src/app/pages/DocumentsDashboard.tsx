@@ -1,135 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ExternalLink, Link2, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveApiBase } from '../lib/apiBaseResolution';
+import {
+  fetchDownloadUrlForSource,
+  type Source,
+} from '../services/documentsService';
+import { useDocumentsDashboardData } from '../hooks/useDocumentsDashboardData';
+import { filterSources, toggleSelectedTag } from '../lib/documentsFilter';
 
-export function resolveApiBase(
-  rawUrl: string,
-  locationOverride?: { hostname: string; protocol: string },
-  fallbackUrl?: string
-): string {
-  const trimmedUrl = (rawUrl || '').trim().replace(/\/+$/, '');
-  const trimmedFallbackUrl = (fallbackUrl || '').trim().replace(/\/+$/, '');
-
-  if (typeof window === 'undefined' && !locationOverride) {
-    return trimmedUrl || rawUrl;
-  }
-
-  const runtimeLocation = locationOverride ?? window.location;
-  const currentHost = runtimeLocation.hostname;
-  const isCurrentHostLocal =
-    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
-  const inferredGatewayHost =
-    currentHost.endsWith('.onrender.com') && currentHost.includes('-frontend')
-      ? currentHost.replace('-frontend', '-gateway')
-      : currentHost;
-
-  if (isCurrentHostLocal) {
-    return trimmedUrl || rawUrl;
-  }
-
-  const normalizeAbsoluteGatewayUrl = (candidateUrl: string): string | null => {
-    if (!candidateUrl || !/^https?:\/\//i.test(candidateUrl)) {
-      return null;
-    }
-
-    try {
-      const parsed = new URL(candidateUrl);
-      const isRenderHost = parsed.hostname.endsWith('.onrender.com');
-      const isRenderAgentHost = isRenderHost && parsed.hostname.includes('-agent');
-      const isRenderGatewayHost = isRenderHost && parsed.hostname.includes('-gateway');
-
-      const normalizeGatewayPath = () => {
-        const path = parsed.pathname.replace(/\/+$/, '');
-        if (!path || path === '/' || path === '/api') {
-          parsed.pathname = '/api/v1';
-        }
-      };
-
-      if (isRenderAgentHost) {
-        parsed.hostname = parsed.hostname.replace('-agent', '-gateway');
-        parsed.protocol = 'https:';
-        parsed.port = '';
-        normalizeGatewayPath();
-        return parsed.toString().replace(/\/+$/, '');
-      }
-
-      if (isRenderGatewayHost) {
-        parsed.protocol = 'https:';
-        parsed.port = '';
-        normalizeGatewayPath();
-        return parsed.toString().replace(/\/+$/, '');
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
-  };
-
-  if (trimmedUrl.startsWith('/')) {
-    const normalizedFallbackGateway = normalizeAbsoluteGatewayUrl(trimmedFallbackUrl);
-    if (normalizedFallbackGateway) {
-      return normalizedFallbackGateway;
-    }
-
-    if (inferredGatewayHost !== currentHost) {
-      return `${runtimeLocation.protocol}//${inferredGatewayHost}${trimmedUrl}`;
-    }
-    return trimmedUrl;
-  }
-
-  try {
-    const parsed = new URL(trimmedUrl || rawUrl);
-    const isRenderHost = parsed.hostname.endsWith('.onrender.com');
-    const isRenderAgentHost = isRenderHost && parsed.hostname.includes('-agent');
-    const isRenderGatewayHost = isRenderHost && parsed.hostname.includes('-gateway');
-    const isConfiguredLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
-    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
-    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
-
-    const normalizeGatewayPath = () => {
-      const path = parsed.pathname.replace(/\/+$/, '');
-      if (!path || path === '/' || path === '/api') {
-        parsed.pathname = '/api/v1';
-      }
-    };
-
-    // If frontend is configured to call a direct agent host on Render,
-    // rewrite to the public gateway host because documents endpoints live on gateway.
-    if (isRenderAgentHost) {
-      parsed.hostname = parsed.hostname.replace('-agent', '-gateway');
-      parsed.protocol = 'https:';
-      parsed.port = '';
-      normalizeGatewayPath();
-      return parsed.toString().replace(/\/+$/, '');
-    }
-
-    // Ensure hosted gateway URLs always include an API prefix.
-    if (isRenderGatewayHost) {
-      parsed.protocol = 'https:';
-      parsed.port = '';
-      normalizeGatewayPath();
-      return parsed.toString().replace(/\/+$/, '');
-    }
-
-    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = inferredGatewayHost;
-      // Render-hosted services terminate TLS on the default port.
-      if (inferredGatewayHost.endsWith('.onrender.com')) {
-        parsed.protocol = 'https:';
-        parsed.port = '';
-      }
-      return parsed.toString().replace(/\/+$/, '');
-    }
-  } catch {
-    return trimmedUrl || rawUrl;
-  }
-
-  return trimmedUrl || rawUrl;
-}
+export { resolveApiBase };
 
 const API_BASE = resolveApiBase(
   (import.meta.env.VITE_GATEWAY_URL as string | undefined) ||
@@ -137,47 +17,6 @@ const API_BASE = resolveApiBase(
   undefined,
   import.meta.env.VITE_BACKEND_URL as string | undefined
 );
-
-interface Source {
-  url: string;
-  title?: string;
-  source_domain?: string;
-  tags?: string[];
-  download_url?: string;
-  downloadable?: boolean;
-}
-
-interface Overview {
-  sources: Source[];
-}
-
-interface TagStat {
-  tag: string;
-  source_count: number;
-}
-
-interface TagStatsResponseRow {
-  tag: string;
-  source_count?: number;
-}
-
-async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: string): Promise<T> {
-  const contentType = response.headers?.get?.('content-type')?.toLowerCase() || '';
-  const looksJson = contentType.includes('application/json');
-
-  if (contentType && !looksJson) {
-    throw new Error(
-      `${endpointLabel} returned non-JSON response (content-type: ${contentType || 'unknown'}). ` +
-        'Check gateway URL configuration.'
-    );
-  }
-
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new Error(`${endpointLabel} returned malformed JSON. Check gateway URL configuration.`);
-  }
-}
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -190,60 +29,14 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 export default function DocumentsDashboard() {
   const { t } = useLanguage();
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [tagStats, setTagStats] = useState<TagStat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { overview, tagStats, loading, error } = useDocumentsDashboardData(API_BASE);
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      fetch(`${API_BASE}/documents/overview`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return parseJsonResponseOrThrow<Overview>(r, '/documents/overview');
-      }),
-      fetch(`${API_BASE}/documents/tags?limit=100`).then((r) => {
-        if (!r.ok) {
-          return { tags: [] };
-        }
-        return parseJsonResponseOrThrow<{ tags?: TagStatsResponseRow[] }>(r, '/documents/tags');
-      }),
-    ])
-      .then(([overviewData, tagsData]) => {
-        setOverview(overviewData);
-        setTagStats(
-          ((tagsData.tags ?? []) as TagStatsResponseRow[]).map((row) => ({
-            tag: row.tag,
-            source_count: row.source_count ?? 0,
-          }))
-        );
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message);
-        setLoading(false);
-      });
-  }, []);
-
   const filteredSources = useMemo(() => {
     if (!overview) return [];
-    return overview.sources.filter((source) => {
-      const query = search.trim().toLowerCase();
-      const searchable =
-        `${source.url} ${source.title ?? ''} ${source.source_domain ?? ''}`.toLowerCase();
-      if (query && !searchable.includes(query)) {
-        return false;
-      }
-
-      if (selectedTags.length === 0) {
-        return true;
-      }
-
-      const sourceTags = new Set((source.tags ?? []).map((tag) => tag.toLowerCase()));
-      return selectedTags.some((tag) => sourceTags.has(tag.toLowerCase()));
-    });
+    return filterSources(overview.sources, search, selectedTags);
   }, [overview, search, selectedTags]);
 
   const resolveDownloadUrl = async (source: Source): Promise<string> => {
@@ -251,22 +44,16 @@ export default function DocumentsDashboard() {
       return source.download_url;
     }
 
-    const response = await fetch(
-      `${API_BASE}/documents/download-url?source_url=${encodeURIComponent(source.url)}`
-    );
-    if (!response.ok) {
-      throw new Error(`${t('docsDownloadError')} (HTTP ${response.status})`);
-    }
-
-    const payload = await parseJsonResponseOrThrow<{ download_url?: string }>(
-      response,
-      '/documents/download-url'
-    );
-    if (!payload.download_url) {
+    try {
+      return await fetchDownloadUrlForSource(API_BASE, source.url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (/^HTTP\s+\d+$/i.test(message)) {
+        const status = message.split(/\s+/)[1];
+        throw new Error(`${t('docsDownloadError')} (HTTP ${status})`);
+      }
       throw new Error(t('docsNoDownloadAvailable'));
     }
-
-    return payload.download_url;
   };
 
   const handleDownload = async (source: Source) => {
@@ -282,9 +69,7 @@ export default function DocumentsDashboard() {
   };
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
-    );
+    setSelectedTags((prev) => toggleSelectedTag(prev, tag));
   };
 
   if (loading) {

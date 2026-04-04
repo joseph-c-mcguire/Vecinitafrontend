@@ -16,6 +16,12 @@ import {
 } from './useConversationStorage';
 import type { StreamEvent, AgentSource, AskQueryParams, AgentResponse } from '../types/agent';
 import { getFallbackSuggestions, normalizeSuggestedQuestions } from '../lib/suggestions';
+import {
+  formatStageLabel,
+  formatToolLabel,
+  getAgentChatCopy,
+  localizeStreamMessage,
+} from '../lib/agentChatStream';
 
 interface UseAgentChatOptions {
   initialThreadId?: string;
@@ -57,23 +63,7 @@ function emitAgentDebugEvent(scope: string, message: string, data?: unknown) {
 export function useAgentChat(options: UseAgentChatOptions = {}) {
   const { initialThreadId, language, provider, model, onError, service } = options;
   const locale: 'en' | 'es' = language === 'es' ? 'es' : 'en';
-  const copy = useMemo(
-    () => ({
-      connecting: locale === 'es' ? 'Conectando con el backend...' : 'Connecting to backend...',
-      generating: locale === 'es' ? 'Generando respuesta...' : 'Generating response...',
-      clarificationNeeded: locale === 'es' ? 'Se necesita aclaración' : 'Clarification needed',
-      toolSummaryTitle: locale === 'es' ? 'Resumen de herramientas' : 'Tool Summary',
-      emptyResponse:
-        locale === 'es'
-          ? 'No pude generar una respuesta en este momento. Inténtalo de nuevo.'
-          : 'I could not generate a response right now. Please try again.',
-      unexpectedError:
-        locale === 'es' ? 'Ocurrió un error inesperado' : 'An unexpected error occurred',
-      encounteredErrorPrefix:
-        locale === 'es' ? 'Lo siento, encontré un error:' : 'Sorry, I encountered an error:',
-    }),
-    [locale]
-  );
+  const copy = useMemo(() => getAgentChatCopy(locale), [locale]);
 
   const serviceClient = useMemo(() => service || agentService, [service]);
   const chatDebugEnabled =
@@ -124,61 +114,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
     });
   }, []);
 
-  const localizeStreamMessage = useCallback(
-    (message?: string) => {
-      const raw = (message || '').trim();
-      if (!raw || locale !== 'es') {
-        return raw;
-      }
-
-      const exactMap: Record<string, string> = {
-        'Checking if I already know this...': 'Verificando si ya conozco esto...',
-        'Looking through our local resources...': 'Revisando nuestros recursos locales...',
-        'I need a bit more information...': 'Necesito un poco mas de informacion...',
-        'Searching for additional information...': 'Buscando informacion adicional...',
-        'Let me think about your question...': 'Dejame pensar en tu pregunta...',
-        'Understanding your question...': 'Entendiendo tu pregunta...',
-        'Finding relevant information...': 'Encontrando informacion relevante...',
-        'Finalizing answer...': 'Finalizando respuesta...',
-        'User clarification is required.': 'Se requieren aclaraciones del usuario.',
-        'Tool call completed.': 'Herramienta completada.',
-        'I need more details to continue.': 'Necesito mas informacion para continuar.',
-        'Service temporarily unavailable. Please try again in a moment.':
-          'Servicio temporalmente no disponible. Intentalo de nuevo en un momento.',
-      };
-
-      if (exactMap[raw]) {
-        return exactMap[raw];
-      }
-
-      const dbSearchSummary = raw.match(/^db_search returned (\d+) relevant chunks\.$/i);
-      if (dbSearchSummary) {
-        return `db_search devolvio ${dbSearchSummary[1]} fragmentos relevantes.`;
-      }
-
-      const webSearchSummary = raw.match(/^web_search returned (\d+) web results\.$/i);
-      if (webSearchSummary) {
-        return `web_search devolvio ${webSearchSummary[1]} resultados web.`;
-      }
-
-      return raw;
-    },
-    [locale]
-  );
-
-  const formatStageLabel = useCallback((stage?: string) => {
-    if (!stage) {
-      return 'Working';
-    }
-    const normalized = stage.trim().toLowerCase();
-    if (!normalized) {
-      return 'Working';
-    }
-    return normalized
-      .split(/[_\s-]+/)
-      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ');
-  }, []);
+  const localizeMessage = useCallback((message?: string) => localizeStreamMessage(locale, message), [locale]);
 
   // Keep one active-thread pointer so route changes/reloads restore the same conversation.
   useEffect(() => {
@@ -351,21 +287,15 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
           });
         };
 
-        const formatToolLabel = (toolName: string) =>
-          toolName
-            .split(/[_\s-]+/)
-            .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-            .join(' ');
-
         // Stream response from agent
         await serviceClient.askStream(requestParams, (event: StreamEvent) => {
           streamEventCount += 1;
           debugLog('stream:event', { type: event.type, count: streamEventCount });
           switch (event.type) {
             case 'thinking':
-              setStreamingMessage(localizeStreamMessage(event.message));
+              setStreamingMessage(localizeMessage(event.message));
               updateProgressFromEvent(event);
-              appendProgressMessage(`• ${localizeStreamMessage(event.message)}`);
+              appendProgressMessage(`• ${localizeMessage(event.message)}`);
               break;
 
             case 'token':
@@ -412,7 +342,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               {
                 sawClarificationEvent = true;
                 const clarificationMessage =
-                  localizeStreamMessage(event.message) ||
+                  localizeMessage(event.message) ||
                   (event.questions && event.questions.length > 0
                     ? event.questions.join(' ')
                     : 'Please provide more details so I can continue.');
@@ -451,9 +381,9 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
               throw new AgentServiceError(event.message, undefined, event.code);
 
             case 'tool_event': {
-              setStreamingMessage(localizeStreamMessage(event.message));
+              setStreamingMessage(localizeMessage(event.message));
               updateProgressFromEvent(event);
-              const localizedToolMessage = localizeStreamMessage(event.message);
+              const localizedToolMessage = localizeMessage(event.message);
               if (event.phase === 'start') {
                 appendProgressMessage(`⏳ ${localizedToolMessage}`);
               } else if (event.phase === 'result') {
@@ -627,7 +557,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
       storage,
       appendProgressMessage,
       formatStageLabel,
-      localizeStreamMessage,
+      localizeMessage,
       pendingClarification,
       language,
       provider,

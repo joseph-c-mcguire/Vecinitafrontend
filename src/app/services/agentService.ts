@@ -27,6 +27,12 @@ import type {
   StreamEvent,
   StreamEventComplete,
 } from '../types/agent';
+import {
+  isDirectRenderAgentHost,
+  normalizeAgentApiBaseUrl,
+  resolveGatewayUrl,
+} from '../lib/agentApiResolution';
+import { parseJsonResponseOrThrow } from '../lib/responseParser';
 
 // Get gateway URL from environment or fallback to localhost
 // In development with Vite proxy, use /api prefix
@@ -35,140 +41,6 @@ const GATEWAY_URL =
   import.meta.env.VITE_BACKEND_URL ||
   (import.meta.env.DEV ? '/api' : 'http://localhost:8004/api/v1');
 
-/**
- * Return true when *hostname* belongs to a Render-hosted agent service.
- *
- * Detection relies on two Render naming conventions:
- * 1. The hostname ends with `.onrender.com`.
- * 2. The subdomain contains the string `"-agent"` (e.g. `vecinita-agent`).
- *
- * This is used to distinguish a frontend talking directly to the agent
- * service (no gateway prefix) from one talking through the unified gateway
- * (where `/ask/config` is the correct config path instead of `/config`).
- */
-function isDirectRenderAgentHost(hostname: string): boolean {
-  return hostname.endsWith('.onrender.com') && hostname.includes('-agent');
-}
-
-function isRenderFrontendHost(hostname: string): boolean {
-  return hostname.endsWith('.onrender.com') && hostname.includes('-frontend');
-}
-
-function getPreferredRenderAgentBaseUrl(currentHost: string, protocol: string): string | null {
-  const configuredBackendUrl = (import.meta.env.VITE_BACKEND_URL || '').trim();
-
-  if (/^https?:\/\//i.test(configuredBackendUrl)) {
-    try {
-      const parsed = new URL(configuredBackendUrl);
-      if (isDirectRenderAgentHost(parsed.hostname)) {
-        return configuredBackendUrl;
-      }
-    } catch {
-      // Ignore malformed overrides and fall back to hostname inference.
-    }
-  }
-
-  if (!isRenderFrontendHost(currentHost)) {
-    return null;
-  }
-
-  return `${protocol}//${currentHost.replace('-frontend', '-agent')}`;
-}
-
-/**
- * Strip the gateway path prefix from a URL pathname when talking directly
- * to the agent service on Render.
- *
- * The unified gateway exposes endpoints under ``/api`` or ``/api/v1``.
- * When the frontend resolves to the agent's hostname directly (no gateway),
- * those prefixes are not valid — the agent serves ``/ask``, ``/config``,
- * etc. at the root.  This function removes the gateway prefix so that the
- * constructed URL resolves correctly against the agent.
- *
- * @param pathname - URL pathname potentially containing a gateway prefix.
- * @returns Pathname with ``/api`` or ``/api/v1`` stripped, or empty string
- *          if the pathname *was* the prefix.
- */
-function stripGatewayPrefixForDirectAgent(pathname: string): string {
-  const normalizedPath = pathname.replace(/\/+$/, '');
-  if (normalizedPath === '/api' || normalizedPath === '/api/v1') {
-    return '';
-  }
-  return normalizedPath;
-}
-
-/**
- * Resolve the effective gateway URL for the current browser context.
- *
- * Handles three scenarios:
- *
- * 1. **SSR / non-browser** — returns *rawUrl* unchanged.
- * 2. **Render hosted frontend** — when the frontend is on
- *    ``<name>-frontend.onrender.com`` and *rawUrl* is a relative path,
- *    the agent hostname is inferred by replacing ``-frontend`` with
- *    ``-agent`` in the current hostname and the inappropriate gateway
- *    prefix is stripped for direct agent hosts.
- * 3. **Local dev** — relative URLs and ``localhost`` absolute URLs pass
- *    through unchanged.
- * 4. **Stale absolute URL** — when an absolute URL contains a
- *    ``localhost`` or wrong-port hostname, the current window hostname is
- *    substituted to avoid cross-origin failures after deployment.
- *
- * @param rawUrl - Raw gateway URL from an environment variable or config.
- * @returns Resolved URL string suitable for use as the fetch base.
- */
-function resolveGatewayUrl(rawUrl: string): string {
-  if (typeof window === 'undefined') {
-    return rawUrl;
-  }
-
-  const trimmedUrl = (rawUrl || '').trim();
-  const currentHost = window.location.hostname;
-  const preferredRenderAgentBaseUrl = getPreferredRenderAgentBaseUrl(
-    currentHost,
-    window.location.protocol
-  );
-  const isCurrentHostLocal =
-    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
-
-  // On hosted environments, a relative /api URL can hit the static frontend server
-  // (returning HTML) or a missing public gateway. Prefer the direct agent host.
-  if (!isCurrentHostLocal && trimmedUrl.startsWith('/')) {
-    if (preferredRenderAgentBaseUrl) {
-      return preferredRenderAgentBaseUrl;
-    }
-    return trimmedUrl;
-  }
-
-  if (isCurrentHostLocal) {
-    return trimmedUrl;
-  }
-
-  try {
-    const parsed = new URL(trimmedUrl);
-    const isRenderGatewayHost =
-      parsed.hostname.endsWith('.onrender.com') && parsed.hostname.includes('-gateway');
-    const isConfiguredLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
-    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
-    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
-
-    if (preferredRenderAgentBaseUrl && isRenderGatewayHost && isStaleAbsoluteHost) {
-      return preferredRenderAgentBaseUrl;
-    }
-
-    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = currentHost;
-      return parsed.toString();
-    }
-  } catch {
-    return trimmedUrl;
-  }
-
-  return trimmedUrl;
-}
 
 export interface AgentServiceTimeouts {
   requestMs: number;
@@ -221,54 +93,6 @@ function emitAgentDebugEvent(scope: string, message: string, data?: unknown): vo
   );
 }
 
-/**
- * Normalise a raw base URL into a canonical API base path.
- *
- * Ensures the resulting URL:
- * - Has no trailing slash.
- * - Ends with `/api/v1` for standard gateway URLs (unless the host is a
- *   direct Render agent, in which case the gateway prefix is stripped).
- * - Returns `'/api'` as a safe fallback when the input is empty.
- *
- * @param baseUrl - Raw base URL (absolute or relative).
- * @returns Normalised base URL string.
- */
-function normalizeApiBaseUrl(baseUrl: string): string {
-  const normalizedInput = (baseUrl || '').trim().replace(/\/+$/, '');
-  if (!normalizedInput) {
-    return '/api';
-  }
-
-  const ensureApiPrefix = (pathname: string): string => {
-    const sanitizedPath = pathname.replace(/\/+$/, '');
-
-    if (!sanitizedPath || sanitizedPath === '/') {
-      return '/api/v1';
-    }
-
-    if (sanitizedPath === '/api') {
-      return '/api/v1';
-    }
-
-    return sanitizedPath;
-  };
-
-  if (/^https?:\/\//i.test(normalizedInput)) {
-    try {
-      const parsed = new URL(normalizedInput);
-      if (isDirectRenderAgentHost(parsed.hostname)) {
-        parsed.pathname = stripGatewayPrefixForDirectAgent(parsed.pathname);
-      } else {
-        parsed.pathname = ensureApiPrefix(parsed.pathname);
-      }
-      return `${parsed.origin}${parsed.pathname}`;
-    } catch {
-      return normalizedInput;
-    }
-  }
-
-  return normalizedInput;
-}
 
 export class AgentServiceError extends Error {
   constructor(
@@ -281,30 +105,6 @@ export class AgentServiceError extends Error {
   }
 }
 
-async function parseJsonResponseOrThrow<T>(response: Response, endpointLabel: string): Promise<T> {
-  const contentType = response.headers?.get?.('content-type')?.toLowerCase() || '';
-  const hasContentType = contentType.length > 0;
-  const looksJson = contentType.includes('application/json');
-
-  if (hasContentType && !looksJson) {
-    throw new AgentServiceError(
-      `${endpointLabel} returned non-JSON response (content-type: ${contentType || 'unknown'}). ` +
-        'This usually indicates a gateway URL/proxy misconfiguration.',
-      response.status,
-      'INVALID_RESPONSE_FORMAT'
-    );
-  }
-
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new AgentServiceError(
-      `${endpointLabel} returned malformed JSON. This usually indicates a gateway URL/proxy misconfiguration.`,
-      response.status,
-      'INVALID_JSON'
-    );
-  }
-}
 
 /**
  * Normalise a raw agent config payload into the canonical {@link AgentConfig}
@@ -411,7 +211,9 @@ class AgentServiceClient {
   private timeouts: AgentServiceTimeouts;
 
   constructor(baseUrl: string = GATEWAY_URL, timeouts: Partial<AgentServiceTimeouts> = {}) {
-    this.baseUrl = normalizeApiBaseUrl(resolveGatewayUrl(baseUrl));
+    this.baseUrl = normalizeAgentApiBaseUrl(
+      resolveGatewayUrl(baseUrl, (import.meta.env.VITE_BACKEND_URL || '').trim())
+    );
     this.timeouts = {
       requestMs: timeouts.requestMs ?? DEFAULT_AGENT_SERVICE_TIMEOUTS.requestMs,
       streamMs: timeouts.streamMs ?? DEFAULT_AGENT_SERVICE_TIMEOUTS.streamMs,
@@ -516,7 +318,12 @@ class AgentServiceClient {
         throw new AgentServiceError(`Agent request failed: ${errorText}`, response.status);
       }
 
-      return await parseJsonResponseOrThrow<AgentResponse>(response, '/ask');
+      return await parseJsonResponseOrThrow<AgentResponse, AgentServiceError>(response, '/ask', {
+        errorFactory: (message, statusCode, code) =>
+          new AgentServiceError(message, statusCode, code),
+        nonJsonHint: 'This usually indicates a gateway URL/proxy misconfiguration.',
+        invalidJsonHint: 'This usually indicates a gateway URL/proxy misconfiguration.',
+      });
     } catch (error) {
       clearTimeout(timeoutId);
 
@@ -710,7 +517,16 @@ class AgentServiceClient {
           throw new AgentServiceError('Failed to fetch agent configuration', response.status);
         }
 
-        const rawConfig = await parseJsonResponseOrThrow<unknown>(response, '/ask/config');
+        const rawConfig = await parseJsonResponseOrThrow<unknown, AgentServiceError>(
+          response,
+          '/ask/config',
+          {
+            errorFactory: (message, statusCode, code) =>
+              new AgentServiceError(message, statusCode, code),
+            nonJsonHint: 'This usually indicates a gateway URL/proxy misconfiguration.',
+            invalidJsonHint: 'This usually indicates a gateway URL/proxy misconfiguration.',
+          }
+        );
         return normalizeAgentConfig(rawConfig);
       } catch (error) {
         lastError = error;
