@@ -8,14 +8,14 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
-import { useBackendSettings } from '../hooks/useBackendSettings';
-import { useAgentChat } from '../hooks/useAgentChat';
+import { useChatState } from '../context/ChatStateContext';
 import { ChatMessage } from './ChatMessage';
 import { Feedback } from './MessageFeedback';
 import { ThemeToggle } from './ThemeToggle';
 import { LanguageSelector } from './LanguageSelector';
 import { AccessibilityPanel } from './AccessibilityPanel';
 import { StreamingIndicator } from './StreamingIndicator';
+import { SuggestionChips } from './SuggestionChips';
 import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 
@@ -67,9 +67,8 @@ export function ChatWidget({
   title,
   themeMode = 'auto',
   zIndex = 1000,
-}: ChatWidgetProps) {
-  const { t, language } = useLanguage();
-  const { selectedLLM } = useBackendSettings();
+}: ChatWidgetProps): JSX.Element {
+  const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isMinimized, setIsMinimized] = useState(false);
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -92,16 +91,10 @@ export function ChatWidget({
     progressMessages = [],
     pendingClarification = null,
     error,
+    splashSuggestions,
     sendMessage,
     retryLastMessage,
-  } = useAgentChat({
-    language: language as 'en' | 'es',
-    provider: selectedLLM?.provider,
-    model: selectedLLM?.model,
-    onError: (err) => {
-      console.error('Agent error:', err);
-    },
-  });
+  } = useChatState();
 
   // Save theme to localStorage
   useEffect(() => {
@@ -110,7 +103,7 @@ export function ChatWidget({
     }
   }, [theme, themeMode]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
 
@@ -125,7 +118,7 @@ export function ChatWidget({
     }
   };
 
-  const handleFeedbackSubmit = (feedback: Feedback) => {
+  const handleFeedbackSubmit = (feedback: Feedback): void => {
     // Store feedback in localStorage
     const storedFeedback = localStorage.getItem('vecinita_widget_feedback');
     const feedbackData = storedFeedback ? JSON.parse(storedFeedback) : {};
@@ -137,15 +130,24 @@ export function ChatWidget({
     localStorage.setItem('vecinita_widget_feedback', JSON.stringify(feedbackData));
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
     }
   };
 
-  const handleRetry = () => {
+  const handleRetry = (): void => {
     retryLastMessage();
+  };
+
+  const handleSuggestionClick = async (suggestion: string): Promise<void> => {
+    if (isLoading || !suggestion.trim()) {
+      return;
+    }
+
+    setInput('');
+    await sendMessage(suggestion);
   };
 
   const progressHint =
@@ -179,6 +181,7 @@ export function ChatWidget({
     return (
       <Button
         onClick={() => setIsOpen(true)}
+        data-testid="chat-widget-open"
         size="icon"
         className={`fixed ${positionClasses[position]} h-14 w-14 rounded-full shadow-lg transition-all hover:scale-110`}
         style={{
@@ -196,6 +199,7 @@ export function ChatWidget({
   return (
     <>
       <div
+        data-testid="chat-widget-panel"
         className={`fixed ${positionClasses[position]} flex flex-col shadow-2xl rounded-lg overflow-hidden border border-border transition-all ${
           isMinimized ? 'h-14' : 'h-[600px]'
         } w-[400px] max-w-[calc(100vw-2rem)]`}
@@ -276,12 +280,39 @@ export function ChatWidget({
               className={`flex-1 overflow-y-auto bg-background ${theme === 'dark' ? 'dark' : ''}`}
             >
               <div className="max-w-full">
+                {messages.length === 0 && (
+                  <div className="px-3 pt-3 text-muted-foreground">
+                    <p className="text-xs">{t('welcomeMessage')}</p>
+                    <SuggestionChips
+                      title={t('suggestionsStartLabel')}
+                      suggestions={splashSuggestions}
+                      onSelect={(suggestion) => {
+                        void handleSuggestionClick(suggestion);
+                      }}
+                      disabled={isLoading}
+                      compact
+                    />
+                  </div>
+                )}
                 {messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                    onFeedbackSubmit={handleFeedbackSubmit}
-                  />
+                  <div key={message.id}>
+                    <ChatMessage message={message} onFeedbackSubmit={handleFeedbackSubmit} />
+                    {message.role === 'assistant' &&
+                      message.content.trim().length > 0 &&
+                      (message.suggestedQuestions || []).length > 0 && (
+                        <div className="px-3 pb-3">
+                          <SuggestionChips
+                            title={t('suggestionsFollowupLabel')}
+                            suggestions={message.suggestedQuestions || []}
+                            onSelect={(suggestion) => {
+                              void handleSuggestionClick(suggestion);
+                            }}
+                            disabled={isLoading}
+                            compact
+                          />
+                        </div>
+                      )}
+                  </div>
                 ))}
                 {(streamingMessage || progressHint) && (
                   <StreamingIndicator message={streamingMessage || progressHint} />
@@ -325,6 +356,7 @@ export function ChatWidget({
             <div className="bg-card p-3">
               <form onSubmit={handleSubmit} className="flex gap-2">
                 <textarea
+                  data-testid="chat-widget-composer"
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
@@ -336,6 +368,7 @@ export function ChatWidget({
                   aria-label={t('typePlaceholder')}
                 />
                 <Button
+                  data-testid="chat-widget-send"
                   type="submit"
                   disabled={!input.trim() || isLoading}
                   size="icon"

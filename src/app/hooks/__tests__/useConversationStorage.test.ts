@@ -6,7 +6,11 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useConversationStorage, type Message } from '../useConversationStorage';
+import {
+  useConversationStorage,
+  ACTIVE_THREAD_STORAGE_KEY,
+  type Message,
+} from '../useConversationStorage';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -369,6 +373,95 @@ describe('useConversationStorage', () => {
 
       // Expired threads should return 0 or null depending on implementation
       expect(remaining === 0 || remaining === null).toBe(true);
+    });
+  });
+
+  describe('active thread and sync utilities', () => {
+    it('should persist and read active thread id', () => {
+      const { result } = renderHook(() => useConversationStorage(threadId));
+
+      act(() => {
+        result.current.setActiveThreadId('active-thread-1');
+      });
+
+      expect(result.current.getActiveThreadId()).toBe('active-thread-1');
+      expect(localStorage.getItem(ACTIVE_THREAD_STORAGE_KEY)).toBe('active-thread-1');
+    });
+
+    it('should return latest thread id by createdAt', () => {
+      const now = Date.now();
+      vi.setSystemTime(now);
+
+      localStorage.setItem(
+        'vecinita-thread-older',
+        JSON.stringify({
+          threadId: 'older',
+          createdAt: now - 5_000,
+          expiresAt: now + 60_000,
+          messages: [],
+        })
+      );
+      localStorage.setItem(
+        'vecinita-thread-newer',
+        JSON.stringify({
+          threadId: 'newer',
+          createdAt: now,
+          expiresAt: now + 60_000,
+          messages: [],
+        })
+      );
+
+      const { result } = renderHook(() => useConversationStorage(threadId));
+      expect(result.current.getLatestThreadId()).toBe('newer');
+    });
+
+    it('should save and load messages for a specific thread id', () => {
+      const { result } = renderHook(() => useConversationStorage(threadId));
+
+      act(() => {
+        result.current.saveMessagesForThread('thread-special', sampleMessages);
+      });
+
+      const loaded = result.current.loadMessagesForThread('thread-special');
+      expect(loaded).toHaveLength(2);
+      expect(loaded?.[0].timestamp).toBeInstanceOf(Date);
+    });
+
+    it('should emit storage sync event for thread updates', () => {
+      const { result } = renderHook(() => useConversationStorage(threadId));
+      const listener = vi.fn();
+
+      const unsubscribe = result.current.subscribeToStorageEvents(listener);
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'vecinita-thread-thread-a',
+          newValue: JSON.stringify({ threadId: 'thread-a' }),
+          oldValue: null,
+        })
+      );
+
+      expect(listener).toHaveBeenCalledWith({ type: 'thread-updated', threadId: 'thread-a' });
+      unsubscribe();
+    });
+
+    it('should emit storage sync event for active-thread changes', () => {
+      const { result } = renderHook(() => useConversationStorage(threadId));
+      const listener = vi.fn();
+
+      const unsubscribe = result.current.subscribeToStorageEvents(listener);
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: ACTIVE_THREAD_STORAGE_KEY,
+          newValue: 'thread-z',
+          oldValue: 'thread-y',
+        })
+      );
+
+      expect(listener).toHaveBeenCalledWith({
+        type: 'active-thread-changed',
+        threadId: 'thread-z',
+      });
+      unsubscribe();
     });
   });
 });

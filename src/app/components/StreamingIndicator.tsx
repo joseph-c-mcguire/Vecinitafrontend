@@ -24,6 +24,7 @@ export function StreamingIndicator({ message, className = '' }: StreamingIndicat
       role="status"
       aria-live="polite"
       aria-label={t('assistant.thinking')}
+      data-testid="streaming-indicator"
     >
       <Loader2 className="h-5 w-5 animate-spin text-primary mt-0.5 flex-shrink-0" />
       <div className="flex-1 min-w-0">

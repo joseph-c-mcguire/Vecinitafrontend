@@ -8,7 +8,10 @@ interface AccessibilityPanelProps {
   onClose: () => void;
 }
 
-export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps) {
+export function AccessibilityPanel({
+  isOpen,
+  onClose,
+}: AccessibilityPanelProps): JSX.Element | null {
   const { t } = useLanguage();
   const {
     settings,
@@ -23,7 +26,7 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
   React.useEffect(() => {
     if (!isOpen) return;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
         event.preventDefault();
         onClose();
@@ -31,7 +34,7 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return (): void => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -39,11 +42,11 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50 z-[2050]" onClick={onClose} aria-hidden="true" />
 
       {/* Panel */}
       <div
-        className="fixed top-0 right-0 h-full w-full sm:w-96 bg-card border-l border-border z-50 shadow-xl overflow-hidden"
+        className="fixed top-0 right-0 h-full w-full sm:w-96 bg-card border-l border-border z-[2100] shadow-xl overflow-hidden"
         role="dialog"
         aria-labelledby="accessibility-title"
         aria-modal="true"
@@ -78,11 +81,9 @@ export function AccessibilityPanel({ isOpen, onClose }: AccessibilityPanelProps)
                 <select
                   id="font-size-select"
                   value={settings.fontSize}
-                    onChange={(e) =>
-                      setFontSize(
-                        e.target.value as 'small' | 'medium' | 'large' | 'extra-large'
-                      )
-                    }
+                  onChange={(e) =>
+                    setFontSize(e.target.value as 'small' | 'medium' | 'large' | 'extra-large')
+                  }
                   className="w-full px-3 py-2 text-sm sm:text-base rounded-lg border border-border bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label={t('fontSize')}
                 >

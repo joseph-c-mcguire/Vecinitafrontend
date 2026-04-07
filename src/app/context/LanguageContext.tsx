@@ -54,6 +54,14 @@ const translations: Translations = {
     en: "Hello! I'm Vecinita, your environmental and community information assistant. I can help you find information about environmental and community topics. Ask me anything!",
     es: '¡Hola! Soy Vecinita, tu asistente de información ambiental y comunitaria. Puedo ayudarte a encontrar información sobre temas ambientales y comunitarios. ¡Pregúntame lo que quieras!',
   },
+  suggestionsStartLabel: {
+    en: 'Try one of these to get started',
+    es: 'Prueba una de estas para comenzar',
+  },
+  suggestionsFollowupLabel: {
+    en: 'Suggested follow-up questions',
+    es: 'Preguntas sugeridas para continuar',
+  },
   newChat: {
     en: 'New chat',
     es: 'Nuevo chat',
@@ -483,8 +491,8 @@ const translations: Translations = {
     es: 'Subido: {count} fragmentos insertados.',
   },
   adminUploadHelp: {
-    en: 'Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into Chroma automatically. Use the Queue tab to monitor progress for URL-based sources.',
-    es: 'Los archivos subidos se dividen en fragmentos (1000 caracteres / 200 de superposición), se vectorizan y se insertan en Chroma automáticamente. Usa la pestaña Cola para supervisar el progreso de las fuentes por URL.',
+    en: 'Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into the Postgres corpus automatically. Use the Queue tab to monitor progress for URL-based sources.',
+    es: 'Los archivos subidos se dividen en fragmentos (1000 caracteres / 200 de superposición), se vectorizan y se insertan automáticamente en el corpus de Postgres. Usa la pestaña Cola para supervisar el progreso de las fuentes por URL.',
   },
   adminAllStatuses: {
     en: 'All statuses',

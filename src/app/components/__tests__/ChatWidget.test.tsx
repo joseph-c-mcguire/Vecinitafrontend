@@ -11,14 +11,14 @@ import { ChatWidget } from '../ChatWidget';
 import { LanguageProvider } from '../../context/LanguageContext';
 import { AccessibilityProvider } from '../../context/AccessibilityContext';
 import { BackendSettingsProvider } from '../../context/BackendSettingsContext';
-import * as useAgentChatModule from '../../hooks/useAgentChat';
+import * as chatStateContextModule from '../../context/ChatStateContext';
 import * as agentServiceModule from '../../services/agentService';
 import type { Message } from '../ChatMessage';
 
-type UseAgentChatState = ReturnType<typeof useAgentChatModule.useAgentChat>;
+type UseAgentChatState = ReturnType<typeof chatStateContextModule.useChatState>;
 
 // Mock hooks and services
-vi.mock('../../hooks/useAgentChat');
+vi.mock('../../context/ChatStateContext');
 vi.mock('../../services/agentService');
 
 // Mock localStorage
@@ -75,6 +75,10 @@ describe('ChatWidget', () => {
     progressMessages: [],
     streamProgress: { stage: 'Working', percent: 0, waiting: false, status: 'working' },
     pendingClarification: null,
+    splashSuggestions: [
+      'What environmental concerns can I report in my neighborhood?',
+      'Where can I find local housing and food assistance resources?',
+    ],
     sendMessage: mockSendMessage,
     loadThread: mockLoadThread,
     clearThread: mockClearThread,
@@ -97,8 +101,8 @@ describe('ChatWidget', () => {
       defaultModel: 'llama-3.1-8b-instant',
     });
 
-    // Mock useAgentChat hook
-    vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue(createUseAgentChatReturn());
+    // Mock shared chat state hook
+    vi.mocked(chatStateContextModule.useChatState).mockReturnValue(createUseAgentChatReturn());
 
     mockSendMessage.mockResolvedValue(undefined);
   });
@@ -207,7 +211,7 @@ describe('ChatWidget', () => {
         },
       ];
 
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
         ...createUseAgentChatReturn(),
         messages,
       });
@@ -236,7 +240,7 @@ describe('ChatWidget', () => {
         startNewConversation: vi.fn(),
       });
 
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue(streamingMock);
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue(streamingMock);
 
       render(
         <TestWrapper>
@@ -254,7 +258,7 @@ describe('ChatWidget', () => {
     it('should display an error panel when an error occurs', async () => {
       const error = new agentServiceModule.AgentServiceError('Network error', 500, 'NETWORK_ERROR');
 
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
         ...createUseAgentChatReturn(),
         error,
       });
@@ -268,6 +272,84 @@ describe('ChatWidget', () => {
       await waitFor(() => {
         expect(screen.getByText('Error')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /retry/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should display splash suggestions when no messages exist', async () => {
+      render(
+        <TestWrapper>
+          <ChatWidget defaultOpen={true} />
+        </TestWrapper>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText(/Try one of these to get started/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should display assistant follow-up suggestions and send on click', async () => {
+      const user = userEvent.setup();
+      const messages: Message[] = [
+        {
+          id: 'assistant-1',
+          role: 'assistant',
+          content: 'Here are relevant resources.',
+          suggestedQuestions: ['Can you summarize this in 3 key points?'],
+          timestamp: new Date(),
+          sources: [],
+        },
+      ];
+
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
+        ...createUseAgentChatReturn(),
+        messages,
+      });
+
+      render(
+        <TestWrapper>
+          <ChatWidget defaultOpen={true} />
+        </TestWrapper>
+      );
+
+      const suggestionButton = await screen.findByRole('button', {
+        name: /Can you summarize this in 3 key points\?/i,
+      });
+      await user.click(suggestionButton);
+
+      await waitFor(() => {
+        expect(mockSendMessage).toHaveBeenCalledWith('Can you summarize this in 3 key points?');
+      });
+
+      expect(screen.getByText('Here are relevant resources.')).toBeInTheDocument();
+    });
+
+    it('should not render follow-up suggestions when assistant response is empty', async () => {
+      const messages: Message[] = [
+        {
+          id: 'assistant-empty',
+          role: 'assistant',
+          content: '   ',
+          suggestedQuestions: ['Can you summarize this in 3 key points?'],
+          timestamp: new Date(),
+          sources: [],
+        },
+      ];
+
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
+        ...createUseAgentChatReturn(),
+        messages,
+      });
+
+      render(
+        <TestWrapper>
+          <ChatWidget defaultOpen={true} />
+        </TestWrapper>
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('button', { name: /Can you summarize this in 3 key points\?/i })
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -358,7 +440,7 @@ describe('ChatWidget', () => {
     });
 
     it('should disable input when loading', async () => {
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
         ...createUseAgentChatReturn(),
         isLoading: true,
       });
@@ -400,7 +482,7 @@ describe('ChatWidget', () => {
         ...new agentServiceModule.AgentServiceError('Request failed', 500, 'REQUEST_FAILED'),
       };
 
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
         ...createUseAgentChatReturn(),
         error,
       });
@@ -422,7 +504,7 @@ describe('ChatWidget', () => {
         ...new agentServiceModule.AgentServiceError('Request failed', 500, 'REQUEST_FAILED'),
       };
 
-      vi.mocked(useAgentChatModule.useAgentChat).mockReturnValue({
+      vi.mocked(chatStateContextModule.useChatState).mockReturnValue({
         ...createUseAgentChatReturn(),
         error,
       });

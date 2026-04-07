@@ -38,3 +38,4 @@ yarn-error.log*
 # playwright
 playwright/
 test-results/
+playwright-report/

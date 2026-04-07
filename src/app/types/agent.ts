@@ -18,6 +18,7 @@ export interface AgentResponse {
   answer: string;
   sources: AgentSource[];
   thread_id?: string;
+  suggested_questions?: string[];
   language?: string;
   model?: string;
 }
@@ -51,6 +52,8 @@ export interface StreamEventComplete {
   type: 'complete';
   answer: string;
   sources: AgentSource[];
+  suggested_questions?: string[];
+  suggestedQuestions?: string[];
   thread_id?: string;
   plan?: string;
   metadata?: {
@@ -120,6 +123,7 @@ export interface AgentConfig {
 export interface AskQueryParams {
   question: string;
   thread_id?: string;
+  context_answer?: string;
   lang?: 'en' | 'es';
   provider?: string;
   model?: string;

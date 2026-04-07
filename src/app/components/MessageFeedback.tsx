@@ -21,14 +21,14 @@ export function MessageFeedback({
   messageId,
   onFeedbackSubmit,
   initialFeedback,
-}: MessageFeedbackProps) {
+}: MessageFeedbackProps): JSX.Element {
   const { language } = useLanguage();
   const [rating, setRating] = useState<FeedbackRating>(initialFeedback?.rating || null);
   const [showCommentBox, setShowCommentBox] = useState(false);
   const [comment, setComment] = useState(initialFeedback?.comment || '');
   const [isSubmitted, setIsSubmitted] = useState(!!initialFeedback);
 
-  const handleRatingClick = (newRating: 'positive' | 'negative') => {
+  const handleRatingClick = (newRating: 'positive' | 'negative'): void => {
     const finalRating = rating === newRating ? null : newRating;
     setRating(finalRating);
 
@@ -51,7 +51,7 @@ export function MessageFeedback({
     }
   };
 
-  const handleCommentSubmit = () => {
+  const handleCommentSubmit = (): void => {
     if (!rating) return;
 
     const feedback: Feedback = {
@@ -69,7 +69,7 @@ export function MessageFeedback({
     }
   };
 
-  const handleCommentCancel = () => {
+  const handleCommentCancel = (): void => {
     setShowCommentBox(false);
     if (!isSubmitted) {
       setRating(null);

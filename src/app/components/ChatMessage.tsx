@@ -17,7 +17,7 @@ interface ChatMessageProps {
   onFeedbackSubmit?: (feedback: Feedback) => void;
 }
 
-export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
+export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps): JSX.Element {
   const { t } = useLanguage();
   const { settings, speak } = useAccessibility();
   const isUser = message.role === 'user';
@@ -39,7 +39,7 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
       }
     : undefined;
 
-  const handleTextClick = () => {
+  const handleTextClick = (): void => {
     if (settings.screenReader) {
       speak(message.content);
     }
@@ -50,6 +50,8 @@ export function ChatMessage({ message, onFeedbackSubmit }: ChatMessageProps) {
       className={cn('flex gap-2 p-3 sm:gap-3 sm:p-4', !isUser && 'bg-muted/30')}
       role="article"
       aria-label={`${isUser ? 'User' : 'Assistant'} message`}
+      data-testid="chat-message"
+      data-message-role={message.role}
     >
       <div
         className={cn(

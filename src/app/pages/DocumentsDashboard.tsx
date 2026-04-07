@@ -1,67 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ExternalLink, Link2, Download } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { resolveApiBase } from '../lib/apiBaseResolution';
+import {
+  fetchDownloadUrlForSource,
+  type Source,
+} from '../services/documentsService';
+import { useDocumentsDashboardData } from '../hooks/useDocumentsDashboardData';
+import { filterSources, toggleSelectedTag } from '../lib/documentsFilter';
 
-function resolveApiBase(rawUrl: string): string {
-  if (typeof window === 'undefined') {
-    return rawUrl;
-  }
-
-  const currentHost = window.location.hostname;
-  const isCurrentHostLocal =
-    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
-
-  if (isCurrentHostLocal) {
-    return rawUrl;
-  }
-
-  try {
-    const parsed = new URL(rawUrl);
-    const isConfiguredLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
-    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
-    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
-
-    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = currentHost;
-      return parsed.toString().replace(/\/+$/, '');
-    }
-  } catch {
-    return rawUrl;
-  }
-
-  return rawUrl;
-}
+export { resolveApiBase };
 
 const API_BASE = resolveApiBase(
   (import.meta.env.VITE_GATEWAY_URL as string | undefined) ||
-    (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1')
+    (import.meta.env.DEV ? '/api/v1' : 'http://localhost:8004/api/v1'),
+  undefined,
+  import.meta.env.VITE_BACKEND_URL as string | undefined
 );
-
-interface Source {
-  url: string;
-  title?: string;
-  source_domain?: string;
-  tags?: string[];
-  download_url?: string;
-  downloadable?: boolean;
-}
-
-interface Overview {
-  sources: Source[];
-}
-
-interface TagStat {
-  tag: string;
-  source_count: number;
-}
-
-interface TagStatsResponseRow {
-  tag: string;
-  source_count?: number;
-}
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
@@ -74,60 +29,14 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
 
 export default function DocumentsDashboard() {
   const { t } = useLanguage();
-  const [overview, setOverview] = useState<Overview | null>(null);
-  const [tagStats, setTagStats] = useState<TagStat[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { overview, tagStats, loading, error } = useDocumentsDashboardData(API_BASE);
   const [search, setSearch] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    Promise.all([
-      fetch(`${API_BASE}/documents/overview`).then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
-      }),
-      fetch(`${API_BASE}/documents/tags?limit=100`).then((r) => {
-        if (!r.ok) {
-          return { tags: [] };
-        }
-        return r.json();
-      }),
-    ])
-      .then(([overviewData, tagsData]) => {
-        setOverview(overviewData);
-        setTagStats(
-          ((tagsData.tags ?? []) as TagStatsResponseRow[]).map((row) => ({
-            tag: row.tag,
-            source_count: row.source_count ?? 0,
-          }))
-        );
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e.message);
-        setLoading(false);
-      });
-  }, []);
-
   const filteredSources = useMemo(() => {
     if (!overview) return [];
-    return overview.sources.filter((source) => {
-      const query = search.trim().toLowerCase();
-      const searchable =
-        `${source.url} ${source.title ?? ''} ${source.source_domain ?? ''}`.toLowerCase();
-      if (query && !searchable.includes(query)) {
-        return false;
-      }
-
-      if (selectedTags.length === 0) {
-        return true;
-      }
-
-      const sourceTags = new Set((source.tags ?? []).map((tag) => tag.toLowerCase()));
-      return selectedTags.some((tag) => sourceTags.has(tag.toLowerCase()));
-    });
+    return filterSources(overview.sources, search, selectedTags);
   }, [overview, search, selectedTags]);
 
   const resolveDownloadUrl = async (source: Source): Promise<string> => {
@@ -135,19 +44,16 @@ export default function DocumentsDashboard() {
       return source.download_url;
     }
 
-    const response = await fetch(
-      `${API_BASE}/documents/download-url?source_url=${encodeURIComponent(source.url)}`
-    );
-    if (!response.ok) {
-      throw new Error(`${t('docsDownloadError')} (HTTP ${response.status})`);
-    }
-
-    const payload = await response.json();
-    if (!payload.download_url) {
+    try {
+      return await fetchDownloadUrlForSource(API_BASE, source.url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (/^HTTP\s+\d+$/i.test(message)) {
+        const status = message.split(/\s+/)[1];
+        throw new Error(`${t('docsDownloadError')} (HTTP ${status})`);
+      }
       throw new Error(t('docsNoDownloadAvailable'));
     }
-
-    return payload.download_url;
   };
 
   const handleDownload = async (source: Source) => {
@@ -163,9 +69,7 @@ export default function DocumentsDashboard() {
   };
 
   const toggleTag = (tag: string) => {
-    setSelectedTags((prev) =>
-      prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
-    );
+    setSelectedTags((prev) => toggleSelectedTag(prev, tag));
   };
 
   if (loading) {

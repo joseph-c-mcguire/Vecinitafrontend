@@ -1,6 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render, waitFor, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import App from '../../App';
+
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
+  const headers = new Headers(init.headers);
+  if (!headers.has('content-type')) {
+    headers.set('content-type', 'application/json; charset=utf-8');
+  }
+
+  return new Response(JSON.stringify(body), {
+    ...init,
+    headers,
+  });
+}
 
 /**
  * Integration tests for the main App component
@@ -12,8 +25,35 @@ describe('App Component - Integration Tests', () => {
     localStorage.clear();
     vi.clearAllMocks();
 
-    // Mock scrollIntoView since jsdom doesn't support it
+    // Mock scrollIntoView / scrollTo since jsdom doesn't support them
     Element.prototype.scrollIntoView = vi.fn();
+    Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
+
+    // Provide default fetch stub so BackendSettingsContext doesn't hang on /ask/config
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.includes('/ask/config') || url.includes('/config')) {
+          return Promise.resolve(
+            jsonResponse({
+              provider: 'ollama',
+              model: 'llama3.2',
+              providers: { available: ['ollama'], current: 'ollama' },
+              models: { available: ['llama3.2'], current: 'llama3.2' },
+              embedding: { model: 'BAAI/bge-small-en-v1.5' },
+            })
+          );
+        }
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve(jsonResponse({ sources: [] }));
+        }
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve(jsonResponse({ tags: [] }));
+        }
+        return Promise.resolve(jsonResponse({}));
+      })
+    );
   });
 
   it('should render main components without import errors', async () => {
@@ -31,6 +71,62 @@ describe('App Component - Integration Tests', () => {
     await waitFor(() => {
       expect(document.body).toBeInTheDocument();
     });
+  });
+
+  it('should navigate between Chat and Documents tabs from the navbar', async () => {
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input);
+
+        if (url.includes('/ask/config')) {
+          return Promise.resolve(
+            jsonResponse({
+              provider: 'ollama',
+              model: 'llama3.2',
+              providers: { available: ['ollama'], current: 'ollama' },
+              models: { available: ['llama3.2'], current: 'llama3.2' },
+              embedding: { model: 'BAAI/bge-small-en-v1.5' },
+            })
+          );
+        }
+
+        if (url.includes('/documents/overview')) {
+          return Promise.resolve(jsonResponse({ sources: [] }));
+        }
+
+        if (url.includes('/documents/tags')) {
+          return Promise.resolve(jsonResponse({ tags: [] }));
+        }
+
+        return Promise.resolve(jsonResponse({}));
+      })
+    );
+
+    window.history.pushState({}, '', '/');
+    render(<App />);
+
+    const documentsLink = await screen.findByRole('link', { name: 'Documents' });
+    await user.click(documentsLink);
+
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/documents');
+    });
+
+    await user.click(screen.getByRole('link', { name: 'Chat' }));
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/');
+    });
+  });
+
+  it('should keep navbar above floating widgets via high z-index class', async () => {
+    render(<App />);
+
+    const header = document.querySelector('header');
+    expect(header).not.toBeNull();
+    expect(header?.className).toContain('z-[2000]');
   });
 });
 

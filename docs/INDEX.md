@@ -31,16 +31,7 @@ Documentation available at root level. Consider creating English-specific versio
 
 Historical documentation and reference material for earlier iterations of Vecinita:
 
-### Legacy Content in [docs/_legacy/](./_legacy/)
-
-- **ADMIN_TOKEN_SETUP.md** - Admin authentication setup (original version)
-- **BACKEND_INTEGRATION_GUIDE.md** - Comprehensive Supabase integration guide (original version)
-- **ARCHITECTURE_OVERVIEW.md** - System architecture of the full-featured version
-- **ATTRIBUTIONS.md** - Credits and attributions
-- **OPTIONAL_CLEANUP.md** - Record of cleanup decisions made during simplification
-- **SIMPLIFICATION_SUMMARY.md** - Changes from original to simplified version
-
-**Note:** These documents are archival context and may differ from current runtime behavior.
+Legacy documents that described earlier frontend architectures have been removed from the active workspace.
 
 ## 📖 Document Organization
 
@@ -72,7 +63,7 @@ frontend/
 
 ## 🔗 Quick Links
 
-- **GitHub Repository:** [Vecinita Frontend](https://github.com/joseph-c-mcguire/Vecinitafrontend)
+- **GitHub Repository:** [Vecinita Frontend](https://github.com/Math-Data-Justice-Collaborative/Vecinitafrontend)
 - **Main Backend Documentation:** See root-level `/docs` folder in the Vecinita monorepo
 
 ## ❓ Additional Help

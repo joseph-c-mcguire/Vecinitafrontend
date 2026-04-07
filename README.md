@@ -77,7 +77,7 @@ Para información sobre accesibilidad, consulta [docs/es/ACCESIBILIDAD.md](./doc
 Esta aplicación está lista para conectarse a un backend RAG. La función `getMockResponse` en `/src/app/App.tsx` debe ser reemplazada con:
 
 1. **Generación de embeddings** para la consulta del usuario
-2. **Búsqueda vectorial** en base de datos Supabase
+2. **Búsqueda vectorial** en PostgreSQL con pgvector
 3. **Construcción de contexto** a partir de documentos coincidentes
 4. **Llamada al LLM** con contexto y consulta
 5. **Retorno de respuesta** con fuentes citadas
@@ -92,11 +92,10 @@ const getRagResponse = async (userMessage: string) => {
     model: settings.embeddingModel
   });
   
-  // 2. Buscar documentos relevantes en vector database
-  const { data: matches } = await supabase.rpc('match_documents', {
-    query_embedding: queryEmbedding,
-    match_threshold: 0.7,
-    match_count: 5
+  // 2. Buscar documentos relevantes en el backend RAG
+  const matches = await searchVectorDatabase(queryEmbedding, {
+    threshold: 0.7,
+    count: 5,
   });
   
   // 3. Construir contexto

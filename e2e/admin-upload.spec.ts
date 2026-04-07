@@ -19,13 +19,17 @@ test.describe('Admin authentication and ingestion', () => {
     page,
   }) => {
     const cleanupSourceUrls = new Set<string>();
-    const maybeSkipForInfraConstraint = async () => {
+    const maybeSkipForInfraConstraint = async (): Promise<void> => {
       const adminError = page.getByText(/Admin API error/i).first();
       const visible = await adminError.isVisible().catch(() => false);
       if (!visible) return;
 
       const message = (await adminError.textContent()) ?? '';
-      if (/429|Too Many Requests|Could not connect to a Chroma server/i.test(message)) {
+      if (
+        /429|Too Many Requests|ECONNREFUSED|connection refused|Could not connect to (?:a|the) (?:database|vector|ingestion|storage|Postgres) (?:backend|service|server)/i.test(
+          message
+        )
+      ) {
         test.skip(true, `Environment constraint for admin ingestion flow: ${message.trim()}`);
       }
     };

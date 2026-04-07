@@ -1,37 +1,5 @@
 // Model Registry Service - fetches available LLM and embedding models from backend services
-
-function resolveApiBase(rawUrl: string): string {
-  if (typeof window === 'undefined') {
-    return rawUrl;
-  }
-
-  const currentHost = window.location.hostname;
-  const isCurrentHostLocal =
-    currentHost === 'localhost' || currentHost === '127.0.0.1' || currentHost === '::1';
-
-  if (isCurrentHostLocal) {
-    return rawUrl;
-  }
-
-  try {
-    const parsed = new URL(rawUrl);
-    const isConfiguredLocal =
-      parsed.hostname === 'localhost' ||
-      parsed.hostname === '127.0.0.1' ||
-      parsed.hostname === '::1';
-    const isGatewayPort = parsed.port === '8004' || parsed.port === '18004';
-    const isStaleAbsoluteHost = parsed.hostname !== currentHost;
-
-    if (isConfiguredLocal || (isGatewayPort && isStaleAbsoluteHost)) {
-      parsed.hostname = currentHost;
-      return parsed.toString().replace(/\/+$/, '');
-    }
-  } catch {
-    return rawUrl;
-  }
-
-  return rawUrl;
-}
+import { resolveApiBase } from '../lib/apiBaseResolution';
 
 const API_BASE = resolveApiBase(
   import.meta.env.VITE_GATEWAY_URL ||
@@ -59,6 +27,8 @@ interface AskConfigResponse {
 }
 
 interface EmbedConfigResponse {
+  model?: string;
+  provider?: string;
   current?: { provider?: string; model?: string };
   available?: {
     providers?: Array<{ key: string; label: string }>;
@@ -82,6 +52,34 @@ function toProviderMap(
   );
 }
 
+function normalizeEmbeddingProviders(
+  embedData: EmbedConfigResponse
+): Record<string, { name: string; models: string[] }> {
+  const fromAvailable = toProviderMap(
+    embedData.available?.providers ?? [],
+    embedData.available?.models ?? {}
+  );
+
+  if (Object.keys(fromAvailable).length > 0) {
+    return fromAvailable;
+  }
+
+  // Newer backend/service config shape can return a flat object
+  // like { provider, model, dimension } without available.providers.
+  const provider = embedData.current?.provider ?? embedData.provider;
+  const model = embedData.current?.model ?? embedData.model;
+  if (!provider || !model) {
+    return {};
+  }
+
+  return {
+    [provider]: {
+      name: provider,
+      models: [model],
+    },
+  };
+}
+
 export async function fetchModelRegistry(): Promise<ModelRegistryData> {
   const [askRes, embedRes] = await Promise.all([
     fetch(`${API_BASE}/ask/config`),
@@ -99,10 +97,7 @@ export async function fetchModelRegistry(): Promise<ModelRegistryData> {
   const embedData = (await embedRes.json()) as EmbedConfigResponse;
 
   const llmProviders = toProviderMap(askData.providers, askData.models);
-  const embeddingProviders = toProviderMap(
-    embedData.available?.providers ?? [],
-    embedData.available?.models ?? {}
-  );
+  const embeddingProviders = normalizeEmbeddingProviders(embedData);
 
   return {
     llmProviders,

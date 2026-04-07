@@ -5,12 +5,13 @@
  * Stores conversations in localStorage with thread-based keys.
  */
 
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useMemo } from 'react';
 
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  suggestedQuestions?: string[];
   sources?: Array<{
     title: string;
     url: string;
@@ -24,16 +25,24 @@ export interface Message {
 }
 
 interface StoredConversation {
+  version?: number;
   messages: Message[];
   expiresAt: number;
   threadId: string;
   createdAt: number;
 }
 
-const STORAGE_PREFIX = 'vecinita-thread-';
+export const STORAGE_PREFIX = 'vecinita-thread-';
+export const ACTIVE_THREAD_STORAGE_KEY = 'vecinita-active-thread';
+const STORAGE_VERSION = 1;
 const TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 const MAX_CONVERSATIONS = 20; // max stored threads
 const MAX_MESSAGES_PER_THREAD = 100; // cap per thread to avoid quota overflow
+
+export interface StorageSyncEvent {
+  type: 'thread-updated' | 'thread-deleted' | 'active-thread-changed';
+  threadId?: string;
+}
 
 /** Safe localStorage wrapper — never throws (private browsing, quota, etc.) */
 const safeStorage = {
@@ -71,6 +80,55 @@ const safeStorage = {
   },
 };
 
+function isConversationActive(data: StoredConversation): boolean {
+  return Number(data.expiresAt) >= Date.now();
+}
+
+function parseStoredConversation(raw: string | null): StoredConversation | null {
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as StoredConversation;
+    if (!parsed || typeof parsed !== 'object' || !parsed.threadId || !parsed.expiresAt) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredActiveThreadId(): string | null {
+  const threadId = safeStorage.get(ACTIVE_THREAD_STORAGE_KEY);
+  return threadId && threadId.trim() ? threadId : null;
+}
+
+export function setStoredActiveThreadId(threadId: string): void {
+  safeStorage.set(ACTIVE_THREAD_STORAGE_KEY, threadId);
+}
+
+export function getLatestStoredThreadId(): string | null {
+  const conversations: Array<{ threadId: string; createdAt: number }> = [];
+
+  for (const key of safeStorage.keys()) {
+    if (!key.startsWith(STORAGE_PREFIX)) {
+      continue;
+    }
+
+    const parsed = parseStoredConversation(safeStorage.get(key));
+    if (!parsed || !isConversationActive(parsed)) {
+      continue;
+    }
+
+    conversations.push({ threadId: parsed.threadId, createdAt: Number(parsed.createdAt) || 0 });
+  }
+
+  conversations.sort((a, b) => b.createdAt - a.createdAt);
+  return conversations[0]?.threadId || null;
+}
+
 /**
  * Custom hook for managing conversation storage with automatic cleanup.
  */
@@ -86,14 +144,9 @@ export function useConversationStorage(threadId: string) {
 
     for (const key of safeStorage.keys()) {
       if (key.startsWith(STORAGE_PREFIX)) {
-        const stored = safeStorage.get(key);
-        if (stored) {
-          try {
-            const data = JSON.parse(stored) as StoredConversation;
-            if (data.expiresAt < now) keysToRemove.push(key);
-          } catch {
-            keysToRemove.push(key); // corrupt — remove
-          }
+        const data = parseStoredConversation(safeStorage.get(key));
+        if (!data || data.expiresAt < now) {
+          keysToRemove.push(key);
         }
       }
     }
@@ -105,12 +158,8 @@ export function useConversationStorage(threadId: string) {
       .keys()
       .filter((k) => k.startsWith(STORAGE_PREFIX))
       .map((k) => {
-        try {
-          const d = JSON.parse(safeStorage.get(k) ?? '{}') as StoredConversation;
-          return { key: k, createdAt: d.createdAt ?? 0 };
-        } catch {
-          return { key: k, createdAt: 0 };
-        }
+        const d = parseStoredConversation(safeStorage.get(k));
+        return { key: k, createdAt: d?.createdAt ?? 0 };
       })
       .sort((a, b) => a.createdAt - b.createdAt); // oldest first
 
@@ -119,6 +168,54 @@ export function useConversationStorage(threadId: string) {
         .slice(0, allThreadKeys.length - MAX_CONVERSATIONS)
         .forEach(({ key }) => safeStorage.remove(key));
     }
+
+    const activeThreadId = getStoredActiveThreadId();
+    if (activeThreadId && !safeStorage.get(`${STORAGE_PREFIX}${activeThreadId}`)) {
+      safeStorage.remove(ACTIVE_THREAD_STORAGE_KEY);
+    }
+  }, []);
+
+  const saveMessagesForThread = useCallback(
+    (targetThreadId: string, messages: Message[]) => {
+      const targetStorageKey = `${STORAGE_PREFIX}${targetThreadId}`;
+      const capped = messages.slice(-MAX_MESSAGES_PER_THREAD);
+      const now = Date.now();
+      const existing = parseStoredConversation(safeStorage.get(targetStorageKey));
+      const conversation: StoredConversation = {
+        version: STORAGE_VERSION,
+        messages: capped,
+        threadId: targetThreadId,
+        createdAt: existing?.createdAt || now,
+        expiresAt: now + TTL_MS,
+      };
+
+      const ok = safeStorage.set(targetStorageKey, JSON.stringify(conversation));
+      if (!ok) {
+        clearExpired();
+        safeStorage.set(targetStorageKey, JSON.stringify(conversation));
+      }
+    },
+    [clearExpired]
+  );
+
+  const loadMessagesForThread = useCallback((targetThreadId: string): Message[] | null => {
+    const targetStorageKey = `${STORAGE_PREFIX}${targetThreadId}`;
+    const data = parseStoredConversation(safeStorage.get(targetStorageKey));
+    if (!data) {
+      return null;
+    }
+    if (!isConversationActive(data)) {
+      safeStorage.remove(targetStorageKey);
+      return null;
+    }
+    return data.messages.map((msg) => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp),
+    }));
+  }, []);
+
+  const deleteThreadById = useCallback((targetThreadId: string) => {
+    safeStorage.remove(`${STORAGE_PREFIX}${targetThreadId}`);
   }, []);
 
   /**
@@ -126,24 +223,9 @@ export function useConversationStorage(threadId: string) {
    */
   const saveMessages = useCallback(
     (messages: Message[]) => {
-      // Enforce per-thread message cap
-      const capped = messages.slice(-MAX_MESSAGES_PER_THREAD);
-      const now = Date.now();
-      const conversation: StoredConversation = {
-        messages: capped,
-        threadId,
-        createdAt: now,
-        expiresAt: now + TTL_MS,
-      };
-
-      const ok = safeStorage.set(storageKey, JSON.stringify(conversation));
-      if (!ok) {
-        // Quota hit — clear expired and retry once
-        clearExpired();
-        safeStorage.set(storageKey, JSON.stringify(conversation));
-      }
+      saveMessagesForThread(threadId, messages);
     },
-    [threadId, storageKey, clearExpired]
+    [threadId, saveMessagesForThread]
   );
 
   /**
@@ -151,29 +233,15 @@ export function useConversationStorage(threadId: string) {
    * Returns null if not found or expired.
    */
   const loadMessages = useCallback((): Message[] | null => {
-    const stored = safeStorage.get(storageKey);
-    if (!stored) return null;
-    try {
-      const data = JSON.parse(stored) as StoredConversation;
-      if (data.expiresAt < Date.now()) {
-        safeStorage.remove(storageKey);
-        return null;
-      }
-      return data.messages.map((msg) => ({
-        ...msg,
-        timestamp: new Date(msg.timestamp),
-      }));
-    } catch {
-      return null;
-    }
-  }, [storageKey]);
+    return loadMessagesForThread(threadId);
+  }, [threadId, loadMessagesForThread]);
 
   /**
    * Delete the current thread from storage.
    */
   const deleteThread = useCallback(() => {
-    safeStorage.remove(storageKey);
-  }, [storageKey]);
+    deleteThreadById(threadId);
+  }, [threadId, deleteThreadById]);
 
   /**
    * Get all stored thread IDs (non-expired).
@@ -186,11 +254,9 @@ export function useConversationStorage(threadId: string) {
       if (key.startsWith(STORAGE_PREFIX)) {
         const stored = safeStorage.get(key);
         if (stored) {
-          try {
-            const data = JSON.parse(stored) as StoredConversation;
-            if (data.expiresAt >= now) threadIds.push(data.threadId);
-          } catch {
-            /* skip corrupt */
+          const data = parseStoredConversation(stored);
+          if (data && data.expiresAt >= now) {
+            threadIds.push(data.threadId);
           }
         }
       }
@@ -203,28 +269,98 @@ export function useConversationStorage(threadId: string) {
    * Returns null if thread doesn't exist.
    */
   const getTimeRemaining = useCallback((): number | null => {
-    const stored = safeStorage.get(storageKey);
-    if (!stored) return null;
-    try {
-      const data = JSON.parse(stored) as StoredConversation;
-      const remaining = data.expiresAt - Date.now();
-      return remaining > 0 ? remaining : 0;
-    } catch {
+    const data = parseStoredConversation(safeStorage.get(storageKey));
+    if (!data) {
       return null;
     }
+    const remaining = data.expiresAt - Date.now();
+    return remaining > 0 ? remaining : 0;
   }, [storageKey]);
+
+  const getLatestThreadId = useCallback((): string | null => getLatestStoredThreadId(), []);
+
+  const getActiveThreadId = useCallback((): string | null => getStoredActiveThreadId(), []);
+
+  const setActiveThreadId = useCallback((newThreadId: string): void => {
+    setStoredActiveThreadId(newThreadId);
+  }, []);
+
+  const subscribeToStorageEvents = useCallback(
+    (listener: (event: StorageSyncEvent) => void): (() => void) => {
+      const onStorage = (event: StorageEvent) => {
+        if (!event.key) {
+          return;
+        }
+
+        if (event.key === ACTIVE_THREAD_STORAGE_KEY) {
+          listener({ type: 'active-thread-changed', threadId: event.newValue || undefined });
+          return;
+        }
+
+        if (!event.key.startsWith(STORAGE_PREFIX)) {
+          return;
+        }
+
+        const updatedThreadId = event.key.slice(STORAGE_PREFIX.length);
+        if (!updatedThreadId) {
+          return;
+        }
+
+        if (event.newValue === null) {
+          listener({ type: 'thread-deleted', threadId: updatedThreadId });
+          return;
+        }
+
+        listener({ type: 'thread-updated', threadId: updatedThreadId });
+      };
+
+      window.addEventListener('storage', onStorage);
+      return () => {
+        window.removeEventListener('storage', onStorage);
+      };
+    },
+    []
+  );
 
   // Run cleanup on mount
   useEffect(() => {
     clearExpired();
   }, [clearExpired]);
 
-  return {
-    saveMessages,
-    loadMessages,
-    deleteThread,
-    clearExpired,
-    getAllThreadIds,
-    getTimeRemaining,
-  };
+  // useMemo keeps the returned object reference stable across renders.
+  // Without this, each render creates a new object, causing effects in
+  // useAgentChat that depend on `storage` to re-run every render and
+  // trigger a React infinite re-render loop.
+  return useMemo(
+    () => ({
+      saveMessages,
+      saveMessagesForThread,
+      loadMessages,
+      loadMessagesForThread,
+      deleteThread,
+      deleteThreadById,
+      clearExpired,
+      getAllThreadIds,
+      getTimeRemaining,
+      getLatestThreadId,
+      getActiveThreadId,
+      setActiveThreadId,
+      subscribeToStorageEvents,
+    }),
+    [
+      saveMessages,
+      saveMessagesForThread,
+      loadMessages,
+      loadMessagesForThread,
+      deleteThread,
+      deleteThreadById,
+      clearExpired,
+      getAllThreadIds,
+      getTimeRemaining,
+      getLatestThreadId,
+      getActiveThreadId,
+      setActiveThreadId,
+      subscribeToStorageEvents,
+    ]
+  );
 }

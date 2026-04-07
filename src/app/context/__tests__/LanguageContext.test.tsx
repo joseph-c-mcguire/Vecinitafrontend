@@ -4,7 +4,7 @@
  * Tests language switching and translation functionality.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { LanguageProvider, useLanguage } from '../LanguageContext';
 
@@ -258,14 +258,9 @@ describe('LanguageContext', () => {
 
   describe('context error', () => {
     it('should throw error when used outside provider', () => {
-      // Suppress console error for this test
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       expect(() => {
         renderHook(() => useLanguage());
       }).toThrow('useLanguage must be used within a LanguageProvider');
-
-      consoleError.mockRestore();
     });
   });
 
