@@ -1,30 +1,82 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, supabaseConfigError } from '@/lib/supabase';
 
-const DEV_ADMIN_ENABLED =
-  (import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false').toLowerCase() === 'true';
-const DEV_ADMIN_EMAIL = import.meta.env.VITE_DEV_ADMIN_EMAIL || '';
-const DEV_ADMIN_PASSWORD = import.meta.env.VITE_DEV_ADMIN_PASSWORD || '';
-const DEV_ADMIN_TOKEN = import.meta.env.VITE_DEV_ADMIN_TOKEN || '';
-const DEV_ADMIN_STORAGE_KEY = 'vecinita-dev-admin-session';
+const ADMIN_AUTH_ENABLED = (
+  import.meta.env.VITE_ADMIN_AUTH_ENABLED || import.meta.env.VITE_DEV_ADMIN_ENABLED || 'false'
+).toLowerCase() === 'true';
+const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL || import.meta.env.VITE_DEV_ADMIN_EMAIL || '';
+const ADMIN_PASSWORD =
+  import.meta.env.VITE_ADMIN_PASSWORD || import.meta.env.VITE_DEV_ADMIN_PASSWORD || '';
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN || import.meta.env.VITE_DEV_ADMIN_TOKEN || '';
+const ADMIN_STORAGE_KEY = 'vecinita-admin-session';
 
-function createDevAdminUser(email: string): User {
-  const timestamp = new Date().toISOString();
+interface AdminUser {
+  id: string;
+  email: string;
+  app_metadata: {
+    role: 'admin';
+  };
+  user_metadata: {
+    provider: 'direct-admin';
+  };
+  created_at: string;
+}
+
+interface AdminSession {
+  email: string;
+  token: string;
+  createdAt: string;
+}
+
+function createAdminUser(email: string): AdminUser {
+  const createdAt = new Date().toISOString();
   return {
-    id: 'dev-admin-local',
-    aud: 'authenticated',
-    role: 'authenticated',
+    id: 'admin-local',
     email,
     app_metadata: { role: 'admin' },
-    user_metadata: { provider: 'local-dev' },
-    created_at: timestamp,
-  } as User;
+    user_metadata: { provider: 'direct-admin' },
+    created_at: createdAt,
+  };
+}
+
+function readStoredSession(): AdminSession | null {
+  try {
+    const rawValue = localStorage.getItem(ADMIN_STORAGE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawValue) as Partial<AdminSession>;
+    if (
+      typeof parsed.email !== 'string' ||
+      typeof parsed.token !== 'string' ||
+      typeof parsed.createdAt !== 'string'
+    ) {
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+      return null;
+    }
+
+    return {
+      email: parsed.email,
+      token: parsed.token,
+      createdAt: parsed.createdAt,
+    };
+  } catch {
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    return null;
+  }
+}
+
+function buildSessionToken(): string {
+  if (ADMIN_TOKEN.trim()) {
+    return ADMIN_TOKEN.trim();
+  }
+
+  return 'local-admin-session';
 }
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: AdminUser | null;
+  session: AdminSession | null;
   loading: boolean;
   isAdmin: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -36,118 +88,73 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AdminUser | null>(null);
+  const [session, setSession] = useState<AdminSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const [devAdminAuthenticated, setDevAdminAuthenticated] = useState(false);
 
   useEffect(() => {
-    if (!isSupabaseConfigured || !supabase) {
-      if (DEV_ADMIN_ENABLED) {
-        try {
-          const stored = localStorage.getItem(DEV_ADMIN_STORAGE_KEY);
-          if (stored) {
-            const parsed = JSON.parse(stored) as { email?: string; token?: string };
-            if (parsed.token === DEV_ADMIN_TOKEN && parsed.email) {
-              setUser(createDevAdminUser(parsed.email));
-              setDevAdminAuthenticated(true);
-            }
-          }
-        } catch {
-          localStorage.removeItem(DEV_ADMIN_STORAGE_KEY);
-        }
-      }
+    if (!ADMIN_AUTH_ENABLED) {
       setLoading(false);
       return;
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    const activeSession = readStoredSession();
+    if (activeSession && activeSession.email) {
+      setSession(activeSession);
+      setUser(createAdminUser(activeSession.email));
+    } else {
+      localStorage.removeItem(ADMIN_STORAGE_KEY);
+      setSession(null);
+      setUser(null);
+    }
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    setLoading(false);
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    if (!isSupabaseConfigured || !supabase) {
-      if (
-        DEV_ADMIN_ENABLED &&
-        DEV_ADMIN_EMAIL &&
-        DEV_ADMIN_PASSWORD &&
-        DEV_ADMIN_TOKEN &&
-        email.trim().toLowerCase() === DEV_ADMIN_EMAIL.trim().toLowerCase() &&
-        password === DEV_ADMIN_PASSWORD
-      ) {
-        localStorage.setItem(
-          DEV_ADMIN_STORAGE_KEY,
-          JSON.stringify({ email: DEV_ADMIN_EMAIL, token: DEV_ADMIN_TOKEN })
-        );
-        setUser(createDevAdminUser(DEV_ADMIN_EMAIL));
-        setSession(null);
-        setDevAdminAuthenticated(true);
-        return { error: null };
-      }
-      return { error: new Error('Invalid admin credentials for local development login.') };
+    if (!ADMIN_AUTH_ENABLED || !ADMIN_EMAIL || !ADMIN_PASSWORD) {
+      return {
+        error: new Error('Admin credentials are not configured for this frontend.'),
+      };
     }
 
-    try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      return { error };
-    } catch (error) {
-      return { error: error as Error };
+    if (
+      email.trim().toLowerCase() !== ADMIN_EMAIL.trim().toLowerCase() ||
+      password !== ADMIN_PASSWORD
+    ) {
+      return { error: new Error('Invalid admin credentials.') };
     }
+
+    const nextSession: AdminSession = {
+      email: ADMIN_EMAIL,
+      token: buildSessionToken(),
+      createdAt: new Date().toISOString(),
+    };
+
+    localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(nextSession));
+    setSession(nextSession);
+    setUser(createAdminUser(ADMIN_EMAIL));
+
+    return { error: null };
   };
 
-  const signUp = async (email: string, password: string) => {
-    if (!isSupabaseConfigured || !supabase) {
-      return { error: new Error(supabaseConfigError) };
-    }
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      return { error };
-    } catch (error) {
-      return { error: error as Error };
-    }
+  const signUp = async (_email: string, _password: string) => {
+    return {
+      error: new Error('Admin sign-up is disabled. Provision credentials through environment configuration.'),
+    };
   };
 
   const signOut = async () => {
-    if (!isSupabaseConfigured || !supabase) {
-      localStorage.removeItem(DEV_ADMIN_STORAGE_KEY);
-      setUser(null);
-      setSession(null);
-      setDevAdminAuthenticated(false);
-      return;
-    }
-    await supabase.auth.signOut();
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+    setUser(null);
+    setSession(null);
   };
-
-  const isAdmin = isSupabaseConfigured
-    ? user?.app_metadata?.role === 'admin'
-    : devAdminAuthenticated;
 
   const value = {
     user,
     session,
     loading,
-    isAdmin,
+    isAdmin: Boolean(session && user),
     signIn,
     signUp,
     signOut,

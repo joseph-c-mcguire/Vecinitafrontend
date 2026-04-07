@@ -3,7 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 // Mock contexts and services
-vi.mock('@/lib/supabase');
 vi.mock('@/app/services/agentService');
 
 // Mock provider component for testing

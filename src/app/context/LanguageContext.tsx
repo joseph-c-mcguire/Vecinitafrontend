@@ -491,8 +491,8 @@ const translations: Translations = {
     es: 'Subido: {count} fragmentos insertados.',
   },
   adminUploadHelp: {
-    en: 'Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into Chroma automatically. Use the Queue tab to monitor progress for URL-based sources.',
-    es: 'Los archivos subidos se dividen en fragmentos (1000 caracteres / 200 de superposición), se vectorizan y se insertan en Chroma automáticamente. Usa la pestaña Cola para supervisar el progreso de las fuentes por URL.',
+    en: 'Uploaded files are chunked (1000 chars / 200 overlap), embedded, and inserted into the Postgres corpus automatically. Use the Queue tab to monitor progress for URL-based sources.',
+    es: 'Los archivos subidos se dividen en fragmentos (1000 caracteres / 200 de superposición), se vectorizan y se insertan automáticamente en el corpus de Postgres. Usa la pestaña Cola para supervisar el progreso de las fuentes por URL.',
   },
   adminAllStatuses: {
     en: 'All statuses',

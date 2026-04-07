@@ -590,7 +590,7 @@ export function useAgentChat(options: UseAgentChatOptions = {}) {
 
   /**
    * Start a completely new conversation — new thread ID, clear messages.
-   * Never calls any API or Supabase. Everything stays in localStorage.
+  * Never calls any external service. Everything stays in localStorage.
    */
   const startNewConversation = useCallback(() => {
     storage.deleteThreadById(threadId);

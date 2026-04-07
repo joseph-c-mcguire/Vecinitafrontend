@@ -2,57 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
-const STORAGE_KEY = 'vecinita-dev-admin-session';
+const STORAGE_KEY = 'vecinita-admin-session';
 
-type SupabaseMockOptions = {
-  configured: boolean;
-  session?: unknown;
-  signInError?: Error | null;
-  signUpError?: Error | null;
-};
-
-async function loadAuthModule(options: SupabaseMockOptions) {
+async function loadAuthModule() {
   vi.resetModules();
 
-  const unsubscribe = vi.fn();
-  const onAuthStateChange = vi.fn((_callback: unknown) => ({
-    data: { subscription: { unsubscribe } },
-  }));
-
-  const signInWithPassword = vi.fn().mockResolvedValue({ error: options.signInError ?? null });
-  const signUp = vi.fn().mockResolvedValue({ error: options.signUpError ?? null });
-  const signOut = vi.fn().mockResolvedValue({});
-
-  const supabaseMock = {
-    auth: {
-      getSession: vi.fn().mockResolvedValue({ data: { session: options.session ?? null } }),
-      onAuthStateChange,
-      signInWithPassword,
-      signUp,
-      signOut,
-    },
-  };
-
-  vi.doMock('@/lib/supabase', () => ({
-    isSupabaseConfigured: options.configured,
-    supabase: options.configured ? supabaseMock : null,
-    supabaseConfigError:
-      'Missing Supabase configuration. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.',
-  }));
-
   const mod = await import('../AuthContext');
-
-  return {
-    ...mod,
-    mocks: {
-      supabaseMock,
-      signInWithPassword,
-      signUp,
-      signOut,
-      onAuthStateChange,
-      unsubscribe,
-    },
-  };
+  return mod;
 }
 
 function createWrapper(AuthProvider: ({ children }: { children: ReactNode }) => JSX.Element) {
@@ -68,10 +24,10 @@ describe('AuthContext', () => {
     localStorage.clear();
   });
 
-  it('returns anonymous state when Supabase is not configured', async () => {
-    vi.stubEnv('VITE_DEV_ADMIN_ENABLED', 'false');
+  it('returns anonymous state when admin auth is disabled', async () => {
+    vi.stubEnv('VITE_ADMIN_AUTH_ENABLED', 'false');
 
-    const { AuthProvider, useAuth } = await loadAuthModule({ configured: false });
+    const { AuthProvider, useAuth } = await loadAuthModule();
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(AuthProvider),
@@ -87,19 +43,18 @@ describe('AuthContext', () => {
     expect(result.current.isAdmin).toBe(false);
   });
 
-  it('hydrates initial session and subscribes/unsubscribes auth listener', async () => {
-    const session = {
-      user: {
-        id: 'user-1',
+  it('hydrates stored admin session', async () => {
+    vi.stubEnv('VITE_ADMIN_AUTH_ENABLED', 'true');
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
         email: 'admin@example.com',
-        app_metadata: { role: 'admin' },
-      },
-    };
+        token: 'admin-token',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      })
+    );
 
-    const { AuthProvider, useAuth, mocks } = await loadAuthModule({
-      configured: true,
-      session,
-    });
+    const { AuthProvider, useAuth } = await loadAuthModule();
 
     const { result, unmount } = renderHook(() => useAuth(), {
       wrapper: createWrapper(AuthProvider),
@@ -111,19 +66,17 @@ describe('AuthContext', () => {
 
     expect(result.current.user?.email).toBe('admin@example.com');
     expect(result.current.isAdmin).toBe(true);
-    expect(mocks.onAuthStateChange).toHaveBeenCalledTimes(1);
 
     unmount();
-    expect(mocks.unsubscribe).toHaveBeenCalledTimes(1);
   });
 
-  it('supports dev-admin local sign-in flow', async () => {
-    vi.stubEnv('VITE_DEV_ADMIN_ENABLED', 'true');
-    vi.stubEnv('VITE_DEV_ADMIN_EMAIL', 'dev-admin@example.com');
-    vi.stubEnv('VITE_DEV_ADMIN_PASSWORD', 'password123');
-    vi.stubEnv('VITE_DEV_ADMIN_TOKEN', 'dev-token');
+  it('supports direct admin sign-in flow', async () => {
+    vi.stubEnv('VITE_ADMIN_AUTH_ENABLED', 'true');
+    vi.stubEnv('VITE_ADMIN_EMAIL', 'dev-admin@example.com');
+    vi.stubEnv('VITE_ADMIN_PASSWORD', 'password123');
+    vi.stubEnv('VITE_ADMIN_TOKEN', 'admin-token');
 
-    const { AuthProvider, useAuth } = await loadAuthModule({ configured: false });
+    const { AuthProvider, useAuth } = await loadAuthModule();
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(AuthProvider),
@@ -140,7 +93,7 @@ describe('AuthContext', () => {
 
     expect(result.current.user?.email).toBe('dev-admin@example.com');
     expect(result.current.isAdmin).toBe(true);
-    expect(localStorage.getItem(STORAGE_KEY)).toContain('dev-token');
+    expect(localStorage.getItem(STORAGE_KEY)).toContain('admin-token');
 
     await act(async () => {
       await result.current.signOut();
@@ -150,13 +103,12 @@ describe('AuthContext', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it('returns local dev sign-in error on invalid credentials', async () => {
-    vi.stubEnv('VITE_DEV_ADMIN_ENABLED', 'true');
-    vi.stubEnv('VITE_DEV_ADMIN_EMAIL', 'dev-admin@example.com');
-    vi.stubEnv('VITE_DEV_ADMIN_PASSWORD', 'password123');
-    vi.stubEnv('VITE_DEV_ADMIN_TOKEN', 'dev-token');
+  it('returns sign-in error on invalid credentials', async () => {
+    vi.stubEnv('VITE_ADMIN_AUTH_ENABLED', 'true');
+    vi.stubEnv('VITE_ADMIN_EMAIL', 'dev-admin@example.com');
+    vi.stubEnv('VITE_ADMIN_PASSWORD', 'password123');
 
-    const { AuthProvider, useAuth } = await loadAuthModule({ configured: false });
+    const { AuthProvider, useAuth } = await loadAuthModule();
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(AuthProvider),
@@ -175,8 +127,12 @@ describe('AuthContext', () => {
     expect(result.current.isAdmin).toBe(false);
   });
 
-  it('uses Supabase signIn/signUp/signOut when configured', async () => {
-    const { AuthProvider, useAuth, mocks } = await loadAuthModule({ configured: true });
+  it('disables self-service sign-up', async () => {
+    vi.stubEnv('VITE_ADMIN_AUTH_ENABLED', 'true');
+    vi.stubEnv('VITE_ADMIN_EMAIL', 'dev-admin@example.com');
+    vi.stubEnv('VITE_ADMIN_PASSWORD', 'password123');
+
+    const { AuthProvider, useAuth } = await loadAuthModule();
 
     const { result } = renderHook(() => useAuth(), {
       wrapper: createWrapper(AuthProvider),
@@ -187,26 +143,13 @@ describe('AuthContext', () => {
     });
 
     await act(async () => {
-      const signInResult = await result.current.signIn('user@example.com', 'pass');
-      expect(signInResult.error).toBeNull();
-    });
-
-    await act(async () => {
       const signUpResult = await result.current.signUp('user@example.com', 'pass');
-      expect(signUpResult.error).toBeNull();
+      expect(signUpResult.error?.message).toMatch(/sign-up is disabled/i);
     });
-
-    await act(async () => {
-      await result.current.signOut();
-    });
-
-    expect(mocks.signInWithPassword).toHaveBeenCalledTimes(1);
-    expect(mocks.signUp).toHaveBeenCalledTimes(1);
-    expect(mocks.signOut).toHaveBeenCalledTimes(1);
   });
 
   it('throws when useAuth is called outside provider', async () => {
-    const { useAuth } = await loadAuthModule({ configured: false });
+    const { useAuth } = await loadAuthModule();
 
     expect(() => renderHook(() => useAuth())).toThrow(
       'useAuth must be used within an AuthProvider'

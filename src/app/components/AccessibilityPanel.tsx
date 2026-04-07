@@ -42,11 +42,11 @@ export function AccessibilityPanel({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-40" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50 z-[2050]" onClick={onClose} aria-hidden="true" />
 
       {/* Panel */}
       <div
-        className="fixed top-0 right-0 h-full w-full sm:w-96 bg-card border-l border-border z-50 shadow-xl overflow-hidden"
+        className="fixed top-0 right-0 h-full w-full sm:w-96 bg-card border-l border-border z-[2100] shadow-xl overflow-hidden"
         role="dialog"
         aria-labelledby="accessibility-title"
         aria-modal="true"
